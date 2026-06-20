@@ -239,16 +239,53 @@ textarea {
 }
 
 @media print {
+  /* Hide navigation, buttons, and non-printable elements */
   .site-header,
   .no-print,
+  nav,
+  button,
+  .demo-banner,
   main > :not(.print-card-wrapper) {
     display: none !important;
   }
+
+  /* Full-width card layout */
   body {
-    background: white;
+    font-size: 12pt;
+    color: #000;
+    background: #fff;
   }
+
   .print-card-wrapper {
     display: block !important;
+  }
+
+  /* Safety card container */
+  .printable-card,
+  .print-card {
+    page-break-inside: avoid;
+    border: 2pt solid #000 !important;
+    padding: 1cm !important;
+    margin: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    text-align: center;
+  }
+
+  /* Phone number emphasis */
+  .safety-phone-number {
+    font-size: 18pt;
+    font-weight: bold;
+    border: 2pt solid #000;
+    padding: 0.2cm 0.5cm;
+    display: inline-block;
+  }
+
+  /* Ensure grayscale-safe */
+  .risk-badge {
+    border: 2pt solid #000 !important;
+    background: #fff !important;
+    color: #000 !important;
   }
 }
 
