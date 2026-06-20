@@ -46,3 +46,13 @@ check reads omit household identifiers, evidence storage internals, contact
 destinations, verification token hashes, and raw evidence spans. Demo mode also
 rejects requests for household IDs other than its explicitly configured demo
 household.
+
+The Supabase check repository always inserts a check as `PAUSED`. Low-concern
+checks remain paused. L2/L3 checks can become `PENDING` only through an injected
+transactional verification creator. If that operation is unavailable or fails,
+the repository throws and the persisted check remains `PAUSED`; it never returns
+a partially created PENDING check.
+
+The prototype does not yet have production household authentication. Until that
+is implemented, unknown and inaccessible public check reads use the same
+not-found response and return no household or contact metadata.

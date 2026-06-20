@@ -23,6 +23,16 @@ export type CreatedVerification = {
   rawToken?: string;
 };
 
+export type PendingVerificationCreationInput = {
+  checkId: string;
+  householdId: string;
+  expiresAt: string;
+};
+
+export interface PendingVerificationCreator {
+  create(input: PendingVerificationCreationInput): Promise<CreatedVerification>;
+}
+
 export type CheckCreationResult = {
   check: PublicCheckRecord;
   verification?: CreatedVerification;
