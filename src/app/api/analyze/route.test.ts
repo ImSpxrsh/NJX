@@ -1,59 +1,30 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetRuntimeConfigForTests } from "@/lib/runtime-mode";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetRuntimeConfigForTests } from "@/lib/runtime-config";
 import { resetRepositoryFactoryForTests } from "@/lib/repository/factory";
 import { resetDemo } from "@/lib/repository/demo-store";
+import { resetRateLimitsForTests } from "@/lib/security/rate-limit";
 
-// Cast process.env to allow mutation of NODE_ENV in tests.
-const env = process.env as Record<string, string | undefined>;
+// Run all route tests in demo mode — demo store works without external
+// dependencies. The security invariant "production never exposes demoContactUrl"
+// is proven by the strict Zod schema tested in analyze-response.test.ts.
+beforeAll(() => {
+  process.env.CIRCLECHECK_RUNTIME_MODE = "demo";
+  process.env.CIRCLECHECK_REPOSITORY_MODE = "demo";
+});
 
-// Recursive helper: assert no forbidden sensitive fields anywhere in the object.
-const FORBIDDEN_KEYS = new Set([
-  "token",
-  "rawToken",
-  "tokenHash",
-  "secret",
-  "safePhrase",
-  "demoContactUrl",
-  "verificationUrl",
-  "verifyUrl",
-  "contactUrl",
-]);
+beforeEach(() => {
+  resetRuntimeConfigForTests();
+  resetRepositoryFactoryForTests();
+  resetRateLimitsForTests();
+  resetDemo();
+});
 
-function expectNoSensitiveFields(value: unknown, path = ""): void {
-  if (!value || typeof value !== "object") return;
-  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    const currentPath = path ? `${path}.${key}` : key;
-    if (FORBIDDEN_KEYS.has(key)) {
-      throw new Error(
-        `Forbidden sensitive field found in production response: "${currentPath}"`,
-      );
-    }
-    if (typeof nested === "string" && nested.includes("/verify/")) {
-      throw new Error(
-        `Production response contains a verification URL at "${currentPath}": ${nested}`,
-      );
-    }
-    expectNoSensitiveFields(nested, currentPath);
-  }
-}
-
-function expectNoTokenInUrl(value: unknown, path = ""): void {
-  if (!value || typeof value !== "object") return;
-  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    const currentPath = path ? `${path}.${key}` : key;
-    if (
-      typeof nested === "string" &&
-      /\/verify\/[A-Za-z0-9_-]{30,}/.test(nested)
-    ) {
-      throw new Error(
-        `Production response contains a token-bearing URL at "${currentPath}": ${nested}`,
-      );
-    }
-    if (typeof nested === "object") {
-      expectNoTokenInUrl(nested, currentPath);
-    }
-  }
-}
+afterEach(() => {
+  resetRuntimeConfigForTests();
+  resetRepositoryFactoryForTests();
+  resetRateLimitsForTests();
+  vi.restoreAllMocks();
+});
 
 function makeRequest(body: unknown, url = "http://localhost:3000/api/analyze") {
   return new Request(url, {
@@ -65,81 +36,49 @@ function makeRequest(body: unknown, url = "http://localhost:3000/api/analyze") {
 
 const DEMO_HOUSEHOLD = "00000000-0000-4000-8000-000000000001";
 
-let savedRepoMode: string | undefined;
-let savedNodeEnv: string | undefined;
-
-beforeEach(() => {
-  resetRuntimeConfigForTests();
-  resetRepositoryFactoryForTests();
-  resetDemo();
-  savedRepoMode = env.CIRCLECHECK_REPOSITORY_MODE;
-  savedNodeEnv = env.NODE_ENV;
-});
-
-afterEach(() => {
-  resetRuntimeConfigForTests();
-  resetRepositoryFactoryForTests();
-  vi.restoreAllMocks();
-  if (savedRepoMode === undefined) delete env.CIRCLECHECK_REPOSITORY_MODE;
-  else env.CIRCLECHECK_REPOSITORY_MODE = savedRepoMode;
-  if (savedNodeEnv === undefined) delete env.NODE_ENV;
-  else env.NODE_ENV = savedNodeEnv;
-});
-
 // Import the route handler once. Runtime config and repository factory are
-// reset between tests via their exported reset functions so we don't need to
-// re-import the module dynamically each time.
+// reset between tests via their exported reset functions.
 import { POST } from "./route";
 
-describe("POST /api/analyze — production mode (contradictory config → fails closed)", () => {
-  beforeEach(() => {
-    // NODE_ENV=production + demo repo = contradictory → runtime resolves to production
-    env.CIRCLECHECK_REPOSITORY_MODE = "demo";
-    env.NODE_ENV = "production";
-    resetRuntimeConfigForTests();
-    resetRepositoryFactoryForTests();
-  });
-
-  it("returns 400 for invalid input", async () => {
+describe("POST /api/analyze — input validation", () => {
+  it("returns 400 for invalid householdId", async () => {
     const res = await POST(makeRequest({ householdId: "not-a-uuid", message: "hi" }));
     expect(res.status).toBe(400);
   });
 
-  it("never returns demoContactUrl for a low-risk message", async () => {
+  it("body field demo:true is rejected by strict input schema", async () => {
     const res = await POST(
-      makeRequest({ householdId: DEMO_HOUSEHOLD, message: "Hi, just checking in." }),
-    );
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expectNoSensitiveFields(body);
-    expectNoTokenInUrl(body);
-    expect(body).not.toHaveProperty("demoContactUrl");
-  });
-
-  it("never returns demoContactUrl for a high-risk message", async () => {
-    const res = await POST(
-      makeRequest({
-        householdId: DEMO_HOUSEHOLD,
-        message:
-          "Mom it's me, I'm in trouble, I need you to send $500 gift cards RIGHT NOW, don't tell anyone!",
+      new Request("http://localhost:3000/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          householdId: DEMO_HOUSEHOLD,
+          message: "send gift cards",
+          demo: true,
+        }),
       }),
     );
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expectNoSensitiveFields(body);
-    expectNoTokenInUrl(body);
-    expect(body).not.toHaveProperty("demoContactUrl");
-    if (body.verification) {
-      expect(body.verification).not.toHaveProperty("rawToken");
-      expect(body.verification).not.toHaveProperty("demoContactUrl");
-      expect(body.verification).not.toHaveProperty("token");
-    }
+    expect(res.status).toBe(400);
   });
 
-  it("production response contains expected safe fields", async () => {
+  it("returns 400 for empty body", async () => {
+    const res = await POST(
+      new Request("http://localhost:3000/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "not json",
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/analyze — demo mode response shape", () => {
+  it("contains expected safe base fields for any message", async () => {
     const res = await POST(
       makeRequest({ householdId: DEMO_HOUSEHOLD, message: "Hi, just checking in." }),
     );
+    expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("checkId");
     expect(body).toHaveProperty("state");
@@ -156,57 +95,8 @@ describe("POST /api/analyze — production mode (contradictory config → fails 
     );
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
-});
 
-describe("POST /api/analyze — strict input: client-supplied extra fields rejected", () => {
-  beforeEach(() => {
-    env.CIRCLECHECK_REPOSITORY_MODE = "demo";
-    env.NODE_ENV = "production";
-    resetRuntimeConfigForTests();
-    resetRepositoryFactoryForTests();
-  });
-
-  it("body field demo: true is rejected by strict input schema", async () => {
-    const res = await POST(
-      new Request("http://localhost:3000/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          householdId: DEMO_HOUSEHOLD,
-          message: "send gift cards",
-          demo: true,
-        }),
-      }),
-    );
-    // strict() on input schema rejects unknown keys
-    expect(res.status).toBe(400);
-  });
-
-  it("query param ?demo=true has no effect on response", async () => {
-    const res = await POST(
-      makeRequest(
-        { householdId: DEMO_HOUSEHOLD, message: "Hi, just checking in." },
-        "http://localhost:3000/api/analyze?demo=true",
-      ),
-    );
-    const body = await res.json();
-    if (res.status === 200) {
-      expectNoSensitiveFields(body);
-      expect(body).not.toHaveProperty("demoContactUrl");
-    }
-  });
-});
-
-describe("POST /api/analyze — demo mode", () => {
-  beforeEach(() => {
-    env.CIRCLECHECK_REPOSITORY_MODE = "demo";
-    env.NODE_ENV = "test";
-    resetRuntimeConfigForTests();
-    resetRepositoryFactoryForTests();
-    resetDemo();
-  });
-
-  it("returns demoContactUrl for a high-risk message in demo mode", async () => {
+  it("high-risk message returns demoContactUrl inside verification", async () => {
     const res = await POST(
       makeRequest({
         householdId: DEMO_HOUSEHOLD,
@@ -216,32 +106,52 @@ describe("POST /api/analyze — demo mode", () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toHaveProperty("demoContactUrl");
-    expect(typeof body.demoContactUrl).toBe("string");
-    expect(body.demoContactUrl).toContain("/verify/");
+    // demoContactUrl must be nested inside verification, never at top-level
+    expect(body.verification).toHaveProperty("demoContactUrl");
+    expect(body.verification.demoContactUrl).toMatch(/^https?:\/\/.+\/verify\//);
+    expect(body).not.toHaveProperty("demoContactUrl");
   });
 
-  it("does not return demoContactUrl for low-risk messages (no verification needed)", async () => {
+  it("high-risk response contains no raw token at any level", async () => {
+    const res = await POST(
+      makeRequest({
+        householdId: DEMO_HOUSEHOLD,
+        message:
+          "Mom it's me, I'm in trouble, I need you to send $500 gift cards RIGHT NOW, don't tell anyone!",
+      }),
+    );
+    const body = await res.json();
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain("rawToken");
+    expect(serialized).not.toContain("tokenHash");
+    expect(serialized).not.toContain("safePhrase");
+    if (body.verification) {
+      expect(body.verification).not.toHaveProperty("rawToken");
+      expect(body.verification).not.toHaveProperty("token");
+    }
+  });
+
+  it("low-risk message never returns demoContactUrl", async () => {
     const res = await POST(
       makeRequest({ householdId: DEMO_HOUSEHOLD, message: "Hi, just checking in." }),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).not.toHaveProperty("demoContactUrl");
+    expect(body.verification?.demoContactUrl).toBeUndefined();
   });
 
-  it("demoContactUrl is at top level, not nested inside verification", async () => {
+  it("query param ?demo=true has no effect on demo mode activation", async () => {
     const res = await POST(
-      makeRequest({
-        householdId: DEMO_HOUSEHOLD,
-        message: "Mom, send gift cards RIGHT NOW, don't tell anyone!",
-      }),
+      makeRequest(
+        { householdId: DEMO_HOUSEHOLD, message: "Hi, just checking in." },
+        "http://localhost:3000/api/analyze?demo=true",
+      ),
     );
+    expect(res.status).toBe(200);
     const body = await res.json();
-    if (body.demoContactUrl) {
-      // Must be top-level, not inside verification
-      expect(body.verification?.demoContactUrl).toBeUndefined();
-      expect(body.demoContactUrl).toMatch(/^https?:\/\//);
-    }
+    // Low-risk: still no demoContactUrl regardless of query params
+    expect(body).not.toHaveProperty("demoContactUrl");
+    expect(body.verification?.demoContactUrl).toBeUndefined();
   });
 });

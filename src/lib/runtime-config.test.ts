@@ -1,5 +1,27 @@
-import { describe, expect, it } from "vitest";
-import { resolveRuntimeConfig } from "./runtime-config";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  resolveRuntimeConfig,
+  getRuntimeConfig,
+  resetRuntimeConfigForTests,
+} from "./runtime-config";
+
+const env = process.env as Record<string, string | undefined>;
+let savedRuntimeMode: string | undefined;
+let savedRepoMode: string | undefined;
+
+beforeEach(() => {
+  savedRuntimeMode = env.CIRCLECHECK_RUNTIME_MODE;
+  savedRepoMode = env.CIRCLECHECK_REPOSITORY_MODE;
+  resetRuntimeConfigForTests();
+});
+
+afterEach(() => {
+  resetRuntimeConfigForTests();
+  if (savedRuntimeMode === undefined) delete env.CIRCLECHECK_RUNTIME_MODE;
+  else env.CIRCLECHECK_RUNTIME_MODE = savedRuntimeMode;
+  if (savedRepoMode === undefined) delete env.CIRCLECHECK_REPOSITORY_MODE;
+  else env.CIRCLECHECK_REPOSITORY_MODE = savedRepoMode;
+});
 
 describe("runtime configuration", () => {
   it.each([
@@ -120,5 +142,27 @@ describe("runtime configuration", () => {
         ...clientControlledNoise,
       } as Parameters<typeof resolveRuntimeConfig>[0]),
     ).toMatchObject({ isDemo: false, allowDemoReset: false });
+  });
+});
+
+describe("getRuntimeConfig — caching and test isolation", () => {
+  it("returns the same object on repeated calls", () => {
+    env.CIRCLECHECK_RUNTIME_MODE = "test";
+    env.CIRCLECHECK_REPOSITORY_MODE = "supabase";
+    expect(getRuntimeConfig()).toBe(getRuntimeConfig());
+  });
+
+  it("resetRuntimeConfigForTests allows fresh resolution after env change", () => {
+    env.CIRCLECHECK_RUNTIME_MODE = "test";
+    env.CIRCLECHECK_REPOSITORY_MODE = "supabase";
+    const first = getRuntimeConfig();
+    expect(first.isDemo).toBe(false);
+
+    resetRuntimeConfigForTests();
+    env.CIRCLECHECK_RUNTIME_MODE = "demo";
+    env.CIRCLECHECK_REPOSITORY_MODE = "demo";
+    const second = getRuntimeConfig();
+    expect(second.isDemo).toBe(true);
+    expect(second).not.toBe(first);
   });
 });
