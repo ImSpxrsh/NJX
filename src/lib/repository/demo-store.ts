@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type {
   CheckRecord,
+  EnrollmentVerificationRecord,
   HouseholdRecord,
   PhoneAlertRecord,
   PublicCheckRecord,
@@ -17,28 +18,36 @@ import {
 } from "@/lib/security/tokens";
 import { sha256 } from "@/lib/security/hashing";
 import type { CircleCheckRepositories, VerificationContext } from "./contracts";
+import {
+  createEnrollmentDemoRepository,
+  resetEnrollmentDemo,
+} from "./enrollment-demo-store";
 
-type Store = {
+export type DemoStore = {
   checks: Map<string, CheckRecord>;
   requests: Map<string, VerificationRequestRecord>;
   phoneCallIds: Set<string>;
   phoneAlerts: Map<string, PhoneAlertRecord>;
+  contacts: Map<string, TrustedContactRecord>;
+  enrollments: Map<string, EnrollmentVerificationRecord>;
 };
 
 const globalStore = globalThis as typeof globalThis & {
-  circleCheckStore?: Store;
+  circleCheckStore?: DemoStore;
 };
 
-const store =
+export const store =
   globalStore.circleCheckStore ??
   (globalStore.circleCheckStore = {
     checks: new Map(),
     requests: new Map(),
     phoneCallIds: new Set(),
     phoneAlerts: new Map(),
+    contacts: new Map(),
+    enrollments: new Map(),
   });
 
-const householdId =
+export const householdId =
   process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001";
 const contactId =
   process.env.DEMO_TRUSTED_CONTACT_ID ?? "00000000-0000-4000-8000-000000000002";
@@ -113,6 +122,35 @@ export function getCheck(id: string): CheckRecord | null {
     check.statusSource = "SYSTEM_EXPIRY";
   }
   return structuredClone(check);
+}
+
+export function expirePendingChecks() {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  let expiredChecks = 0;
+  let expiredRequests = 0;
+
+  for (const request of store.requests.values()) {
+    if (
+      request.status !== "PENDING" ||
+      Date.parse(request.expiresAt) > now.getTime()
+    ) {
+      continue;
+    }
+
+    request.status = "EXPIRED";
+    expiredRequests += 1;
+
+    const check = store.checks.get(request.checkId);
+    if (check?.state === "PENDING") {
+      check.state = transitionCheck(check.state, "EXPIRED");
+      check.updatedAt = nowIso;
+      check.statusSource = "SYSTEM_EXPIRY";
+      expiredChecks += 1;
+    }
+  }
+
+  return { expiredChecks, expiredRequests };
 }
 
 function toPublicCheck(check: CheckRecord): PublicCheckRecord {
@@ -193,6 +231,17 @@ export function respondToVerification(
     }
     return { ok: false as const, code: "EXPIRED" as const };
   }
+  if (check.state !== "PENDING") {
+    return { ok: false as const, code: "ALREADY_USED" as const };
+  }
+  const superseded = [...store.requests.values()].some(
+    (candidate) =>
+      candidate.checkId === request.checkId &&
+      Date.parse(candidate.createdAt) > Date.parse(request.createdAt),
+  );
+  if (superseded) {
+    return { ok: false as const, code: "ALREADY_USED" as const };
+  }
 
   const now = new Date().toISOString();
   request.response = response;
@@ -219,10 +268,7 @@ export function respondToVerification(
   return {
     ok: true as const,
     state: check.state,
-    message:
-      check.state === "VERIFIED"
-        ? "The enrolled contact confirmed making this request."
-        : "The enrolled contact denied making this request.",
+    message: "Verification response recorded.",
   };
 }
 
@@ -238,6 +284,9 @@ export function resetDemo() {
   store.requests.clear();
   store.phoneCallIds.clear();
   store.phoneAlerts.clear();
+  store.enrollments.clear();
+  resetEnrollmentDemo();
+  seedContacts();
 }
 
 const demoHousehold: HouseholdRecord = {
@@ -256,6 +305,13 @@ const demoContact: TrustedContactRecord = {
   destinationVerifiedAt: new Date(0).toISOString(),
   createdAt: new Date(0).toISOString(),
 };
+
+/** (Re)seed the canonical demo contact. Idempotent. */
+export function seedContacts(): void {
+  store.contacts.set(demoContact.id, structuredClone(demoContact));
+}
+
+seedContacts();
 
 export function createDemoRepositories(): CircleCheckRepositories {
   return {
@@ -285,12 +341,23 @@ export function createDemoRepositories(): CircleCheckRepositories {
     },
     trustedContacts: {
       async getInternalById(id) {
-        return id === demoContact.id ? structuredClone(demoContact) : null;
+        const contact = store.contacts.get(id);
+        return contact ? structuredClone(contact) : null;
       },
       async getVerifiedForHousehold(id) {
-        return id === householdId ? structuredClone(demoContact) : null;
+        // Only a destination-verified contact may receive a high-trust request.
+        for (const contact of store.contacts.values()) {
+          if (
+            contact.householdId === id &&
+            contact.destinationVerifiedAt !== null
+          ) {
+            return structuredClone(contact);
+          }
+        }
+        return null;
       },
     },
+    enrollmentVerifications: createEnrollmentDemoRepository(),
     verificationRequests: {
       async getContext(rawToken) {
         return getVerificationContext(rawToken);
@@ -301,6 +368,11 @@ export function createDemoRepositories(): CircleCheckRepositories {
       async getInternalById(id) {
         const request = store.requests.get(id);
         return request ? structuredClone(request) : null;
+      },
+    },
+    expiry: {
+      async expirePendingChecks() {
+        return expirePendingChecks();
       },
     },
     phoneAlerts: {
