@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "db:types": "npx supabase gen types typescript --local > src/types/database.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

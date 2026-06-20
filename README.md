@@ -30,3 +30,17 @@ npm run build
 
 See `docs/` for architecture, API contracts, threat model, demo steps, and
 limitations.
+
+## Database types
+
+`src/types/database.ts` is synchronized with the checked-in Supabase migration.
+After changing the local Supabase schema, regenerate it with:
+
+```bash
+npm run db:types
+```
+
+Review generated changes together with the migration. Domain code must continue
+to use runtime-validated mapper functions rather than trusting generated row
+types at API boundaries. Read mappers validate database rows, while write
+mappers construct restricted inserts such as PAUSED-only check creation.
