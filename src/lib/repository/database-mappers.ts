@@ -10,6 +10,8 @@ import type {
   TrustedContactRecord,
   VerificationRequestRecord,
 } from "@/types/domain";
+import type { Json, TableInsert } from "@/types/database";
+import type { CheckCreationInput } from "./contracts";
 
 const isoTimestamp = z.string().datetime({ offset: true });
 const nullableTimestamp = isoTimestamp.nullable();
@@ -24,6 +26,31 @@ const checkState = z.enum([
 const verificationLevel = z.enum(["L0", "L1", "L2", "L3"]);
 const source = z.enum(["web", "phone"]);
 const policyReasons = z.array(z.string().trim().max(500)).max(20);
+
+function toJson(value: unknown): Json {
+  return JSON.parse(JSON.stringify(value)) as Json;
+}
+
+export function toPausedCheckInsert(
+  input: CheckCreationInput,
+): TableInsert<"checks"> {
+  const extraction = evidenceExtractionSchema.parse(input.extraction);
+  const reasons = policyReasons.parse(input.decision.reasons);
+  return {
+    household_id: z.string().uuid().parse(input.householdId),
+    source: source.parse(input.source),
+    state: "PAUSED",
+    verification_level: verificationLevel.parse(input.decision.level),
+    sanitized_summary: z
+      .string()
+      .trim()
+      .max(500)
+      .parse(extraction.plainLanguageSummary),
+    evidence_json: toJson(extraction),
+    policy_reasons: toJson(reasons),
+    expires_at: null,
+  };
+}
 
 const checkRowSchema = z
   .object({
@@ -187,5 +214,23 @@ export function mapPhoneAlertRow(row: unknown): PhoneAlertRecord {
     callSidHash: parsed.twilio_call_sid_hash,
     pressedDigit: parsed.pressed_digit,
     createdAt: parsed.created_at,
+  };
+}
+
+const consumeVerificationResultSchema = z
+  .object({
+    result_state: z.enum(["PENDING", "VERIFIED", "DENIED"]),
+    result_message: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+export function mapConsumeVerificationTokenResult(row: unknown): {
+  state: "PENDING" | "VERIFIED" | "DENIED";
+  message: string;
+} {
+  const parsed = consumeVerificationResultSchema.parse(row);
+  return {
+    state: parsed.result_state,
+    message: parsed.result_message,
   };
 }

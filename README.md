@@ -42,4 +42,5 @@ npm run db:types
 
 Review generated changes together with the migration. Domain code must continue
 to use runtime-validated mapper functions rather than trusting generated row
-types at API boundaries.
+types at API boundaries. Read mappers validate database rows, while write
+mappers construct restricted inserts such as PAUSED-only check creation.

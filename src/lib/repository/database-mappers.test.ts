@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { fixtures } from "@/fixtures/messages";
-import { mapCheckRow, mapPublicCheckRow } from "./database-mappers";
+import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
+import {
+  mapCheckRow,
+  mapConsumeVerificationTokenResult,
+  mapPublicCheckRow,
+  toPausedCheckInsert,
+} from "./database-mappers";
 
 const timestamp = "2026-06-20T12:00:00.000Z";
 
@@ -67,5 +73,43 @@ describe("database mappers", () => {
         expires_at: "2026-06-20T12:10:00.000Z",
       }).expiresAt,
     ).toBe("2026-06-20T12:10:00.000Z");
+  });
+
+  it("maps domain check creation into a fixed PAUSED insert", async () => {
+    const extraction = await new FixtureEvidenceExtractor().extract({
+      text: fixtures.giftCardEmergency,
+      requestId: "mapper-test",
+    });
+    const insert = toPausedCheckInsert({
+      householdId: "00000000-0000-4000-8000-000000000001",
+      source: "web",
+      extraction,
+      decision: evaluatePolicy(extraction),
+    });
+    expect(insert).toMatchObject({
+      state: "PAUSED",
+      verification_level: "L3",
+      expires_at: null,
+    });
+    expect(JSON.stringify(insert)).not.toContain(fixtures.giftCardEmergency);
+    expect(insert).not.toHaveProperty("token_hash");
+  });
+
+  it("validates verification-consumption RPC results", () => {
+    expect(
+      mapConsumeVerificationTokenResult({
+        result_state: "VERIFIED",
+        result_message: "Contact response recorded",
+      }),
+    ).toEqual({
+      state: "VERIFIED",
+      message: "Contact response recorded",
+    });
+    expect(() =>
+      mapConsumeVerificationTokenResult({
+        result_state: "APPROVED",
+        result_message: "Untrusted state",
+      }),
+    ).toThrow();
   });
 });
