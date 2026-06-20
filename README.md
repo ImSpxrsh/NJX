@@ -16,7 +16,18 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000/demo` for the deterministic two-screen demo.
+Demo behavior is disabled by default. For the deterministic two-screen demo,
+set these server-side values:
+
+```env
+CIRCLECHECK_RUNTIME_MODE=demo
+CIRCLECHECK_REPOSITORY_MODE=demo
+PUBLIC_APP_URL=http://localhost:3000
+```
+
+Then open `http://localhost:3000/demo`. A production-built deployment must also
+set `CIRCLECHECK_DEMO_DEPLOYMENT=true` deliberately; production plus demo
+without that marker is rejected.
 
 ## Quality gates
 

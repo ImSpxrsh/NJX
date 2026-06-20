@@ -61,6 +61,22 @@ the check to PENDING in one database transaction. Contact selection is stable by
 enrollment time and ID. The function is executable only by the service role;
 database policy tests assert both the service-role grant and anonymous denial.
 
+## Runtime and demo boundary
+
+`src/lib/runtime-config.ts` is the sole server-side runtime-mode resolver. Demo
+mode requires the exact value `CIRCLECHECK_RUNTIME_MODE=demo` and the demo
+repository. Missing, false-like, mixed-case, whitespace-padded, or invalid
+values do not enable it. A production-built deployment additionally requires
+`CIRCLECHECK_DEMO_DEPLOYMENT=true`; otherwise contradictory production/demo
+configuration throws.
+
+Production `/api/analyze` uses a strict schema that cannot contain a demo URL,
+raw token, token hash, or verification credential. Explicit demo mode uses a
+different strict schema. `/api/demo/reset` checks runtime and same-origin
+authorization before constructing a repository or mutating data. The root
+server layout renders the persistent accessible demo warning; query parameters,
+headers, cookies, and browser storage do not participate in runtime resolution.
+
 The prototype does not yet have production household authentication. Until that
 is implemented, Supabase public check reads fail closed unless trusted server
 code supplies a household scope. Missing, unknown, and mismatched scopes all
