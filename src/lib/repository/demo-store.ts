@@ -16,10 +16,7 @@ import {
   isValidTokenFormat,
 } from "@/lib/security/tokens";
 import { sha256 } from "@/lib/security/hashing";
-import type {
-  CircleCheckRepositories,
-  VerificationContext,
-} from "./contracts";
+import type { CircleCheckRepositories, VerificationContext } from "./contracts";
 
 type Store = {
   checks: Map<string, CheckRecord>;
@@ -119,6 +116,17 @@ export function getCheck(id: string): CheckRecord | null {
 }
 
 function toPublicCheck(check: CheckRecord): PublicCheckRecord {
+  const signals = Object.fromEntries(
+    Object.entries(check.extraction.signals).map(([name, signal]) => [
+      name,
+      {
+        name: signal.name,
+        score: signal.score,
+        present: signal.present,
+        explanation: signal.explanation,
+      },
+    ]),
+  ) as PublicCheckRecord["signals"];
   return {
     id: check.id,
     source: check.source,
@@ -131,7 +139,7 @@ function toPublicCheck(check: CheckRecord): PublicCheckRecord {
     updatedAt: check.updatedAt,
     expiresAt: check.expiresAt,
     statusSource: check.statusSource,
-    signals: check.extraction.signals,
+    signals,
   };
 }
 
@@ -253,6 +261,9 @@ export function createDemoRepositories(): CircleCheckRepositories {
   return {
     checks: {
       async create(input) {
+        if (input.householdId !== householdId) {
+          throw new Error("Demo household unavailable.");
+        }
         const result = createCheck({
           extraction: input.extraction,
           decision: input.decision,

@@ -13,6 +13,8 @@ export type EvidenceSignal = {
   explanation: string;
 };
 
+export type PublicEvidenceSignal = Omit<EvidenceSignal, "evidenceSpans">;
+
 export type EvidenceExtraction = {
   schemaVersion: "1.0";
   requestedAction: string | null;
@@ -86,7 +88,7 @@ export type PublicCheckRecord = Omit<
   CheckRecord,
   "householdId" | "extraction"
 > & {
-  signals: EvidenceExtraction["signals"];
+  signals: Record<SignalName, PublicEvidenceSignal>;
 };
 
 export type HouseholdRecord = {

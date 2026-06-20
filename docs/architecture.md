@@ -43,4 +43,6 @@ Supabase directly.
 
 Repository reads are divided into public-safe and privileged methods. Public
 check reads omit household identifiers, evidence storage internals, contact
-destinations, and verification token hashes.
+destinations, verification token hashes, and raw evidence spans. Demo mode also
+rejects requests for household IDs other than its explicitly configured demo
+household.

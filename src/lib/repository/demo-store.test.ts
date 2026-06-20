@@ -3,6 +3,7 @@ import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
 import { fixtures } from "@/fixtures/messages";
 import {
+  createDemoRepositories,
   createCheck,
   getCheck,
   resetDemo,
@@ -53,5 +54,36 @@ describe("trusted-contact loop", () => {
   it("never stores the raw suspicious message", async () => {
     const { check } = await setup();
     expect(JSON.stringify(check)).not.toContain(fixtures.giftCardEmergency);
+  });
+
+  it("rejects an unrelated household through the repository boundary", async () => {
+    const extraction = await new FixtureEvidenceExtractor().extract({
+      text: fixtures.ordinary,
+      requestId: "test",
+    });
+    await expect(
+      createDemoRepositories().checks.create({
+        householdId: "00000000-0000-4000-8000-000000000099",
+        source: "web",
+        extraction,
+        decision: evaluatePolicy(extraction),
+      }),
+    ).rejects.toThrow("Demo household unavailable");
+  });
+
+  it("omits evidence spans from public-safe reads", async () => {
+    const extraction = await new FixtureEvidenceExtractor().extract({
+      text: fixtures.giftCardEmergency,
+      requestId: "test",
+    });
+    const created = await createDemoRepositories().checks.create({
+      householdId: "00000000-0000-4000-8000-000000000001",
+      source: "web",
+      extraction,
+      decision: evaluatePolicy(extraction),
+    });
+    expect(JSON.stringify(created.check)).not.toContain("evidenceSpans");
+    expect(created.check).not.toHaveProperty("householdId");
+    expect(created.check).not.toHaveProperty("extraction");
   });
 });
