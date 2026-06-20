@@ -8,7 +8,7 @@ import type {
   VerificationLevel,
 } from "./domain";
 
-export type AnalyzeResponse = {
+export type AnalyzeProductionResponse = {
   checkId: string;
   state: "PAUSED" | "PENDING";
   extraction: EvidenceExtraction;
@@ -16,9 +16,21 @@ export type AnalyzeResponse = {
   verification?: {
     requestId: string;
     expiresAt: string;
-    demoContactUrl?: string;
   };
 };
+
+export type AnalyzeDemoResponse = Omit<
+  AnalyzeProductionResponse,
+  "verification"
+> & {
+  verification?: {
+    requestId: string;
+    expiresAt: string;
+    demoContactUrl: string;
+  };
+};
+
+export type AnalyzeResponse = AnalyzeProductionResponse | AnalyzeDemoResponse;
 
 export type CheckStatusResponse = {
   checkId: string;
