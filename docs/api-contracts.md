@@ -28,13 +28,23 @@ check PENDING. Every response consumes the link once.
 
 ## `POST /api/twilio/voice`
 
-Validates the Twilio signature when configured and returns TwiML containing a
+Verifies the Twilio signature (see below) and returns TwiML containing a
 one-digit Gather. It configures no recording or transcription.
 
 ## `POST /api/twilio/gather`
 
 Digit 1 creates an idempotent phone-originated pending verification. Other
 digits create no approval. CallSid is represented only by a SHA-256 hash.
+
+### Twilio signature verification (CC-206)
+
+Both Twilio routes verify the request before any processing. The signature is
+checked against the reconstructed public URL (pinned via `TWILIO_PUBLIC_BASE_URL`
+or `PUBLIC_APP_URL`, else forwarded headers). Missing, invalid, and
+not-configured cases all return a generic `403 Forbidden` with no side effects.
+Unsigned requests are permitted only with an explicit non-production
+`TWILIO_ALLOW_UNSIGNED=true`; production with no auth token fails closed. See
+`docs/twilio-security.md`.
 
 ## Enrollment destination verification (CC-202)
 
