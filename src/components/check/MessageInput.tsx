@@ -34,11 +34,12 @@ export function MessageInput() {
       setBusy(false);
       return;
     }
-    if (body.verification?.demoContactUrl) {
-      sessionStorage.setItem(
-        `circlecheck:${body.checkId}`,
-        body.verification.demoContactUrl,
-      );
+    const demoContactUrl =
+      body.verification && "demoContactUrl" in body.verification
+        ? body.verification.demoContactUrl
+        : null;
+    if (demoContactUrl) {
+      sessionStorage.setItem(`circlecheck:${body.checkId}`, demoContactUrl);
     }
     router.push(`/check/${body.checkId}`);
   }

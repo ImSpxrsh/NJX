@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server";
 import twilio from "twilio";
-import { validateTwilioRequest } from "@/lib/security/twilio-signature";
-import { parseTwilioParams } from "@/lib/security/twilio-request";
+import { verifyTwilioRequest } from "@/lib/security/twilio-webhook";
 import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
 import { getRepositories } from "@/lib/repository/factory";
 
 export async function POST(request: Request) {
-  const params = await parseTwilioParams(request);
-  if (
-    !validateTwilioRequest({
-      signature: request.headers.get("x-twilio-signature"),
-      url: request.url,
-      params,
-    })
-  ) {
-    return new NextResponse("Invalid signature", { status: 403 });
+  const verification = await verifyTwilioRequest(request);
+  if (!verification.ok) {
+    // Generic response: no processing, no trust-state change on any failure.
+    return new NextResponse("Forbidden", { status: 403 });
   }
+  const params = verification.params;
   const response = new twilio.twiml.VoiceResponse();
   if (params.Digits !== "1") {
     response.say(

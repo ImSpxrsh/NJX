@@ -1,6 +1,9 @@
 import "server-only";
 import type { CircleCheckRepositories } from "./contracts";
 import { createDemoRepositories } from "./demo-store";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createSupabaseRepositories } from "./supabase-repositories";
+import { getRuntimeConfig } from "@/lib/runtime-config";
 
 export type RepositoryMode = "demo" | "supabase";
 
@@ -35,9 +38,18 @@ let repositories: CircleCheckRepositories | undefined;
 
 export function getRepositories(): CircleCheckRepositories {
   if (repositories) return repositories;
-  const mode = resolveRepositoryMode(process.env.CIRCLECHECK_REPOSITORY_MODE);
+  const mode = resolveRepositoryMode(getRuntimeConfig().repositoryMode);
   repositories = createRepositories(mode, {
     demo: createDemoRepositories,
+    supabase: () => {
+      const client = createServerSupabaseClient();
+      if (!client) {
+        throw new Error(
+          "Supabase mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
+        );
+      }
+      return createSupabaseRepositories(client);
+    },
   });
   return repositories;
 }

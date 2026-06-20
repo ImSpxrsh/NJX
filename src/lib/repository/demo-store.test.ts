@@ -9,6 +9,7 @@ import {
   resetDemo,
   resolveHouseholdForCaller,
   respondToVerification,
+  expirePendingChecks,
 } from "./demo-store";
 
 describe("trusted-contact loop", () => {
@@ -76,6 +77,65 @@ describe("trusted-contact loop", () => {
         process.env.VERIFICATION_TOKEN_TTL_MINUTES = previousTtl;
       }
     }
+  });
+
+  it("lazy status reads expose SYSTEM_EXPIRY for expired pending checks", async () => {
+    const previousTtl = process.env.VERIFICATION_TOKEN_TTL_MINUTES;
+    process.env.VERIFICATION_TOKEN_TTL_MINUTES = "-1";
+    try {
+      const { check, verification } = await setup();
+      expect(getCheck(check.id)).toMatchObject({
+        state: "EXPIRED",
+        statusSource: "SYSTEM_EXPIRY",
+      });
+      expect(
+        respondToVerification(verification!.rawToken, "CONFIRMED_MINE"),
+      ).toMatchObject({ ok: false, code: "EXPIRED" });
+    } finally {
+      if (previousTtl === undefined) {
+        delete process.env.VERIFICATION_TOKEN_TTL_MINUTES;
+      } else {
+        process.env.VERIFICATION_TOKEN_TTL_MINUTES = previousTtl;
+      }
+    }
+  });
+
+  it("proactively expires pending checks idempotently", async () => {
+    const previousTtl = process.env.VERIFICATION_TOKEN_TTL_MINUTES;
+    process.env.VERIFICATION_TOKEN_TTL_MINUTES = "-1";
+    try {
+      const { check } = await setup();
+      expect(expirePendingChecks()).toEqual({
+        expiredChecks: 1,
+        expiredRequests: 1,
+      });
+      expect(expirePendingChecks()).toEqual({
+        expiredChecks: 0,
+        expiredRequests: 0,
+      });
+      expect(getCheck(check.id)).toMatchObject({
+        state: "EXPIRED",
+        statusSource: "SYSTEM_EXPIRY",
+      });
+    } finally {
+      if (previousTtl === undefined) {
+        delete process.env.VERIFICATION_TOKEN_TTL_MINUTES;
+      } else {
+        process.env.VERIFICATION_TOKEN_TTL_MINUTES = previousTtl;
+      }
+    }
+  });
+
+  it("expiry never changes terminal checks", async () => {
+    const { check, verification } = await setup();
+    expect(
+      respondToVerification(verification!.rawToken, "DENIED_MINE"),
+    ).toMatchObject({ ok: true, state: "DENIED" });
+    expect(expirePendingChecks()).toEqual({
+      expiredChecks: 0,
+      expiredRequests: 0,
+    });
+    expect(getCheck(check.id)?.state).toBe("DENIED");
   });
 
   it("accepts only one concurrent response", async () => {

@@ -10,6 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "eval:evidence": "vitest run src/evals/evidence-eval.test.ts",
+    "test:cc204": "vitest run src/lib/runtime-config.test.ts src/lib/api/analyze-request.test.ts src/lib/api/analyze-response.test.ts src/lib/demo/reset.test.ts src/components/accessibility/DemoModeBanner.test.tsx",
+    "db:types": "npx supabase gen types typescript --local > src/types/database.ts",
+    "test:db": "npx supabase test db",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -18,6 +21,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "libphonenumber-js": "^1.13.7",
     "next": "^16.2.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

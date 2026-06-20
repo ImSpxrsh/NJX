@@ -39,5 +39,15 @@ describe("phone caller mapping migration", () => {
     expect(migration).toContain(
       "alter table public.phone_caller_mappings enable row level security",
     );
+describe("expire_pending_checks migration", () => {
+  const functionBody = migration.slice(
+    migration.indexOf("create or replace function public.expire_pending_checks"),
+    migration.indexOf("revoke all on function public.expire_pending_checks"),
+  );
+
+  it("expires only pending checks and requests", () => {
+    expect(functionBody).toContain("where state = 'PENDING'");
+    expect(functionBody).toContain("where status = 'PENDING'");
+    expect(functionBody).toContain("'SYSTEM_EXPIRY'");
   });
 });

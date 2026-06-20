@@ -49,6 +49,7 @@ describe("repository factory", () => {
         "verificationRequests",
         "phoneAlerts",
         "verificationNotifications",
+        "expiry",
         "households",
       ]),
     );
