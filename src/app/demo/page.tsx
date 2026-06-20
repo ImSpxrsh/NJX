@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { fixtures } from "@/fixtures/messages";
-import type { AnalyzeResponse } from "@/types/api";
+import type { AnalyzeResponse, AnalyzeDemoResponse } from "@/types/api";
+
+function isDemoResponse(r: AnalyzeResponse): r is AnalyzeDemoResponse {
+  return "demoContactUrl" in r;
+}
 
 export default function DemoPage() {
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
@@ -21,11 +25,8 @@ export default function DemoPage() {
       }),
     });
     const body = (await response.json()) as AnalyzeResponse;
-    if (body.verification?.demoContactUrl) {
-      sessionStorage.setItem(
-        `circlecheck:${body.checkId}`,
-        body.verification.demoContactUrl,
-      );
+    if (isDemoResponse(body)) {
+      sessionStorage.setItem(`circlecheck:${body.checkId}`, body.demoContactUrl);
     }
     setResult(body);
     setBusy(false);
@@ -48,10 +49,10 @@ export default function DemoPage() {
             <a className="button" href={`/check/${result.checkId}`}>
               Open senior view
             </a>
-            {result.verification?.demoContactUrl && (
+            {isDemoResponse(result) && (
               <a
                 className="button secondary"
-                href={result.verification.demoContactUrl}
+                href={result.demoContactUrl}
               >
                 Open trusted-contact view
               </a>

@@ -8,7 +8,8 @@ import type {
   VerificationLevel,
 } from "./domain";
 
-export type AnalyzeResponse = {
+// Production response — never contains verification tokens or demo-only fields.
+export type AnalyzeProductionResponse = {
   checkId: string;
   state: "PAUSED" | "PENDING";
   extraction: EvidenceExtraction;
@@ -16,9 +17,15 @@ export type AnalyzeResponse = {
   verification?: {
     requestId: string;
     expiresAt: string;
-    demoContactUrl?: string;
   };
 };
+
+// Demo response — only returned from an explicitly enabled demo deployment.
+export type AnalyzeDemoResponse = AnalyzeProductionResponse & {
+  demoContactUrl: string;
+};
+
+export type AnalyzeResponse = AnalyzeProductionResponse | AnalyzeDemoResponse;
 
 export type CheckStatusResponse = {
   checkId: string;

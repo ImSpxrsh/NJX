@@ -4,7 +4,7 @@ import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { LlmEvidenceExtractor } from "@/lib/evidence/llm-extractor";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
 import { getRepositories } from "@/lib/repository/factory";
-import type { AnalyzeResponse } from "@/types/api";
+import { getRuntimeConfig } from "@/lib/runtime-mode";
 
 const inputSchema = z
   .object({
@@ -14,7 +14,39 @@ const inputSchema = z
   })
   .strict();
 
+// Production response schema — strict so that any accidental demo-only field
+// causes a parse error rather than leaking to the client.
+const productionVerificationSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    expiresAt: z.string(),
+  })
+  .strict();
+
+const productionResponseSchema = z
+  .object({
+    checkId: z.string().uuid(),
+    state: z.enum(["PAUSED", "PENDING"]),
+    extraction: z.unknown(),
+    decision: z.unknown(),
+    verification: productionVerificationSchema.optional(),
+  })
+  .strict();
+
+// Demo response extends production with the simulated contact URL.
+// This schema is only used when CIRCLECHECK_REPOSITORY_MODE=demo.
+const demoResponseSchema = productionResponseSchema
+  .omit({ verification: true })
+  .extend({
+    verification: productionVerificationSchema.optional(),
+    demoContactUrl: z.string().url(),
+  });
+
 export async function POST(request: Request) {
+  // Runtime mode is resolved from server-side environment configuration only.
+  // Client-supplied data (query params, headers, body, cookies) cannot affect it.
+  const runtime = getRuntimeConfig();
+
   const parsed = inputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
@@ -22,14 +54,15 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const requestId = crypto.randomUUID();
+
   const extractor =
     parsed.data.mode === "llm"
       ? new LlmEvidenceExtractor()
       : new FixtureEvidenceExtractor();
+
   const extraction = await extractor.extract({
     text: parsed.data.message,
-    requestId,
+    requestId: crypto.randomUUID(),
   });
   const decision = evaluatePolicy(extraction);
   const repositories = getRepositories();
@@ -39,8 +72,9 @@ export async function POST(request: Request) {
     extraction,
     decision,
   });
-  const appUrl = process.env.PUBLIC_APP_URL ?? new URL(request.url).origin;
-  const response: AnalyzeResponse = {
+
+  // Base response contains no verification tokens or demo-only fields.
+  const safeBase = {
     checkId: check.id,
     state: check.state as "PAUSED" | "PENDING",
     extraction,
@@ -50,12 +84,27 @@ export async function POST(request: Request) {
           verification: {
             requestId: verification.requestId,
             expiresAt: verification.expiresAt,
-            demoContactUrl: `${appUrl}/verify/${verification.rawToken}`,
           },
         }
       : {}),
   };
-  return NextResponse.json(response, {
+
+  // Demo branch: only reachable in an explicitly enabled demo deployment.
+  // Production never executes this branch.
+  if (runtime.isDemo && verification?.rawToken) {
+    const appUrl =
+      process.env.PUBLIC_APP_URL ?? new URL(request.url).origin;
+    return NextResponse.json(
+      demoResponseSchema.parse({
+        ...safeBase,
+        demoContactUrl: `${appUrl}/verify/${verification.rawToken}`,
+      }),
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  // Production branch: strict schema prevents any demo field from appearing.
+  return NextResponse.json(productionResponseSchema.parse(safeBase), {
     headers: { "Cache-Control": "no-store" },
   });
 }

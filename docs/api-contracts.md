@@ -6,9 +6,40 @@ messages, contact destinations, or service credentials.
 ## `POST /api/analyze`
 
 Input: `{ householdId: uuid, message: string, mode?: "fixture"|"llm" }`.
-Returns the check ID, PAUSED/PENDING state, validated extraction, deterministic
-decision, and optional request metadata. In demo mode only, it also returns a
-clearly labeled contact URL to simulate delivery.
+
+**Production response** — strict schema, no demo-only fields:
+```json
+{
+  "checkId": "<uuid>",
+  "state": "PAUSED | PENDING",
+  "extraction": { ... },
+  "decision": { ... },
+  "verification": {
+    "requestId": "<uuid>",
+    "expiresAt": "<iso8601>"
+  }
+}
+```
+`verification` is omitted when no contact confirmation is required.
+The production schema never includes `demoContactUrl`, raw tokens, token
+hashes, or verification URLs. The strict Zod schema will throw rather than
+silently include forbidden fields.
+
+**Demo response** — only returned when `CIRCLECHECK_REPOSITORY_MODE=demo`
+and `NODE_ENV` is not `production`:
+```json
+{
+  "checkId": "<uuid>",
+  "state": "PENDING",
+  "extraction": { ... },
+  "decision": { ... },
+  "verification": { "requestId": "<uuid>", "expiresAt": "<iso8601>" },
+  "demoContactUrl": "http://localhost:3000/verify/<token>"
+}
+```
+`demoContactUrl` is present only when verification is required.
+Client-supplied data (query params, headers, body fields, cookies) cannot
+activate demo mode or cause `demoContactUrl` to appear.
 
 ## `GET /api/checks/:id`
 
@@ -38,5 +69,12 @@ digits create no approval. CallSid is represented only by a SHA-256 hash.
 
 ## `POST /api/demo/reset`
 
-Clears process-local demo state. This route must be disabled or authenticated
-before a public production deployment.
+Clears process-local demo state.
+
+**Unavailable outside demo mode.** Returns `404 Not Found` when
+`CIRCLECHECK_REPOSITORY_MODE` is not `demo`, or when `NODE_ENV=production`
+regardless of repository mode. The 404 check occurs before any database
+access; no state is read or mutated on non-demo requests.
+
+In demo mode, resets only the in-memory demo store. The response body is
+`{ "ok": true }` with no tokens, verification URLs, or household identifiers.

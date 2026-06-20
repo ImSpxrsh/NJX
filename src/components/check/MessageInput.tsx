@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fixtures } from "@/fixtures/messages";
-import type { AnalyzeResponse } from "@/types/api";
+import type { AnalyzeResponse, AnalyzeDemoResponse } from "@/types/api";
+
+function isDemoResponse(r: AnalyzeResponse): r is AnalyzeDemoResponse {
+  return "demoContactUrl" in r;
+}
 
 const householdId =
   process.env.NEXT_PUBLIC_DEMO_HOUSEHOLD_ID ??
@@ -34,11 +38,8 @@ export function MessageInput() {
       setBusy(false);
       return;
     }
-    if (body.verification?.demoContactUrl) {
-      sessionStorage.setItem(
-        `circlecheck:${body.checkId}`,
-        body.verification.demoContactUrl,
-      );
+    if (isDemoResponse(body)) {
+      sessionStorage.setItem(`circlecheck:${body.checkId}`, body.demoContactUrl);
     }
     router.push(`/check/${body.checkId}`);
   }
