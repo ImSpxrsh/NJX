@@ -36,6 +36,8 @@ create table public.checks (
   sanitized_summary text not null check (char_length(sanitized_summary) <= 500),
   evidence_json jsonb not null,
   policy_reasons jsonb not null,
+  status_source text not null default 'POLICY_ENGINE'
+    check (status_source in ('POLICY_ENGINE', 'ENROLLED_CONTACT', 'NO_RESPONSE', 'SYSTEM_EXPIRY')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   expires_at timestamptz
@@ -64,51 +66,84 @@ create table public.phone_alerts (
   created_at timestamptz not null default now()
 );
 
+create table public.phone_caller_mappings (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households(id) on delete cascade,
+  caller_phone_hash text not null unique check (char_length(caller_phone_hash) = 64),
+  created_at timestamptz not null default now()
+);
+
 create index checks_state_idx on public.checks(state);
 create index checks_expiry_idx on public.checks(expires_at);
 create index trusted_contacts_household_idx on public.trusted_contacts(household_id);
 create index verification_requests_hash_idx on public.verification_requests(token_hash);
 create index verification_requests_expiry_idx on public.verification_requests(expires_at);
+create index phone_caller_mappings_household_idx on public.phone_caller_mappings(household_id);
 
 alter table public.households enable row level security;
 alter table public.trusted_contacts enable row level security;
 alter table public.checks enable row level security;
 alter table public.verification_requests enable row level security;
 alter table public.phone_alerts enable row level security;
+alter table public.phone_caller_mappings enable row level security;
 
 create or replace function public.consume_verification_token(
   supplied_token text,
   supplied_response public.verification_response
-) returns table(result_state public.check_state, result_message text)
+) returns table(result_status text, result_state public.check_state, result_message text)
 language plpgsql
 security definer
 set search_path = public, extensions
 as $$
 declare
-  matched_request public.verification_requests%rowtype;
+  matched_request_id uuid;
+  matched_check_id uuid;
   next_state public.check_state;
 begin
-  select * into matched_request
-  from public.verification_requests
-  where token_hash = encode(digest(supplied_token, 'sha256'), 'hex')
-    and status = 'PENDING'
-    and used_at is null
-    and expires_at > now()
-  for update;
-
-  if not found then
-    raise exception 'Verification request unavailable';
+  if supplied_token is null or supplied_token !~ '^[A-Za-z0-9_-]{43}$' then
+    return query select
+      'REJECTED',
+      null::public.check_state,
+      'Verification response was not accepted';
+    return;
   end if;
 
-  update public.verification_requests
-  set response = supplied_response,
-      responded_at = now(),
-      used_at = now(),
-      status = 'COMPLETED'
-  where id = matched_request.id;
+  select vr.id, vr.check_id into matched_request_id, matched_check_id
+  from public.verification_requests vr
+  join public.checks c on c.id = vr.check_id
+  where vr.token_hash = encode(digest(supplied_token, 'sha256'), 'hex')
+    and vr.status = 'PENDING'
+    and vr.used_at is null
+    and vr.expires_at > now()
+    and c.state = 'PENDING'
+    and not exists (
+      select 1
+      from public.verification_requests newer
+      where newer.check_id = vr.check_id
+        and newer.created_at > vr.created_at
+    )
+  for update of vr, c;
+
+  if not found then
+    return query select
+      'REJECTED',
+      null::public.check_state,
+      'Verification response was not accepted';
+    return;
+  end if;
 
   if supplied_response = 'CALL_ME' then
-    return query select 'PENDING'::public.check_state, 'Callback requested';
+    update public.verification_requests
+    set response = supplied_response,
+        responded_at = now(),
+        used_at = now(),
+        status = 'COMPLETED'
+    where id = matched_request_id;
+
+    return query select
+      'ACCEPTED',
+      'PENDING'::public.check_state,
+      'Verification response recorded';
     return;
   end if;
 
@@ -119,15 +154,63 @@ begin
 
   update public.checks
   set state = next_state, updated_at = now()
-  where id = matched_request.check_id and state = 'PENDING';
+  where id = matched_check_id and state = 'PENDING';
 
   if not found then
-    raise exception 'Check is not pending';
+    return query select
+      'REJECTED',
+      null::public.check_state,
+      'Verification response was not accepted';
+    return;
   end if;
 
-  return query select next_state, 'Contact response recorded';
+  update public.verification_requests
+  set response = supplied_response,
+      responded_at = now(),
+      used_at = now(),
+      status = 'COMPLETED'
+  where id = matched_request_id;
+
+  return query select
+    'ACCEPTED',
+    next_state,
+    'Verification response recorded';
 end;
 $$;
 
 revoke all on function public.consume_verification_token(text, public.verification_response)
+from public, anon, authenticated;
+
+create or replace function public.expire_pending_checks()
+returns table(expired_checks integer, expired_requests integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  request_count integer;
+  check_count integer;
+begin
+  update public.verification_requests
+  set status = 'EXPIRED'
+  where status = 'PENDING'
+    and expires_at <= now();
+
+  get diagnostics request_count = row_count;
+
+  update public.checks
+  set state = 'EXPIRED',
+      status_source = 'SYSTEM_EXPIRY',
+      updated_at = now()
+  where state = 'PENDING'
+    and expires_at is not null
+    and expires_at <= now();
+
+  get diagnostics check_count = row_count;
+
+  return query select check_count, request_count;
+end;
+$$;
+
+revoke all on function public.expire_pending_checks()
 from public, anon, authenticated;

@@ -48,6 +48,8 @@ describe("repository factory", () => {
         "trustedContacts",
         "verificationRequests",
         "phoneAlerts",
+        "verificationNotifications",
+        "expiry",
         "households",
       ]),
     );

@@ -16,6 +16,9 @@ demo behavior.
 ## Starting the demo
 
 1. Run `npm install`, copy `.env.example` to `.env.local`, and run `npm run dev`.
+1. Run `npm install`, copy `.env.example` to `.env.local`, set
+   `CIRCLECHECK_RUNTIME_MODE=demo` and `CIRCLECHECK_REPOSITORY_MODE=demo`, then
+   run `npm run dev`.
 2. Open `http://localhost:3000/demo`.
    A yellow **DEMO MODE** banner is visible at the top of every page while
    demo mode is active. It will not appear in production.
@@ -26,7 +29,10 @@ demo behavior.
 6. Select **No, this request was not mine**, confirm, and return to the senior
    tab. Short polling changes the source-labeled state to DENIED.
 7. For Twilio, call the configured number and press 1. The spoken path stores no
-   audio; use server/Supabase inspection until contact delivery is integrated.
+   audio recording, transcription, or speech model configuration. Known caller
+   routing creates a pending L3 check and delivers the same one-time
+   trusted-contact link path as web checks; unknown callers hear only
+   printed-card safety instructions.
 8. To demonstrate network failure, stop the dev server. The user should continue
    to follow the printed-card instruction and known callback number.
 9. External model failure needs no intervention: fixture/rule extraction is the

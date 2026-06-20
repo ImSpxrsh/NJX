@@ -16,7 +16,18 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000/demo` for the deterministic two-screen demo.
+Demo behavior is disabled by default. For the deterministic two-screen demo,
+set these server-side values:
+
+```env
+CIRCLECHECK_RUNTIME_MODE=demo
+CIRCLECHECK_REPOSITORY_MODE=demo
+PUBLIC_APP_URL=http://localhost:3000
+```
+
+Then open `http://localhost:3000/demo`. A production-built deployment must also
+set `CIRCLECHECK_DEMO_DEPLOYMENT=true` deliberately; production plus demo
+without that marker is rejected.
 
 ## Quality gates
 
@@ -30,3 +41,24 @@ npm run build
 
 See `docs/` for architecture, API contracts, threat model, demo steps, and
 limitations.
+
+## Database types
+
+`src/types/database.ts` is synchronized with the checked-in Supabase migration.
+After changing the local Supabase schema, regenerate it with:
+
+```bash
+npm run db:types
+```
+
+Review generated changes together with the migration. Domain code must continue
+to use runtime-validated mapper functions rather than trusting generated row
+types at API boundaries. Read mappers validate database rows, while write
+mappers construct restricted inserts such as PAUSED-only check creation.
+
+Database policy tests require a running local Supabase stack:
+
+```bash
+npx supabase start
+npm run test:db
+```

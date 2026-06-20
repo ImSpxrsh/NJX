@@ -32,6 +32,12 @@ export default function DemoPage() {
     setBusy(false);
   }
 
+import { notFound } from "next/navigation";
+import { DemoControls } from "@/components/demo/DemoControls";
+import { getRuntimeConfig } from "@/lib/runtime-config";
+
+export default function DemoPage() {
+  if (!getRuntimeConfig().isDemo) notFound();
   return (
     <>
       <p className="eyebrow">Deterministic presentation mode</p>
@@ -60,6 +66,7 @@ export default function DemoPage() {
           </div>
         )}
       </section>
+      <DemoControls />
     </>
   );
 }
