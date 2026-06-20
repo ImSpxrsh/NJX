@@ -36,6 +36,8 @@ create table public.checks (
   sanitized_summary text not null check (char_length(sanitized_summary) <= 500),
   evidence_json jsonb not null,
   policy_reasons jsonb not null,
+  status_source text not null default 'POLICY_ENGINE'
+    check (status_source in ('POLICY_ENGINE', 'ENROLLED_CONTACT', 'NO_RESPONSE', 'SYSTEM_EXPIRY')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   expires_at timestamptz
@@ -168,4 +170,38 @@ end;
 $$;
 
 revoke all on function public.consume_verification_token(text, public.verification_response)
+from public, anon, authenticated;
+
+create or replace function public.expire_pending_checks()
+returns table(expired_checks integer, expired_requests integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  request_count integer;
+  check_count integer;
+begin
+  update public.verification_requests
+  set status = 'EXPIRED'
+  where status = 'PENDING'
+    and expires_at <= now();
+
+  get diagnostics request_count = row_count;
+
+  update public.checks
+  set state = 'EXPIRED',
+      status_source = 'SYSTEM_EXPIRY',
+      updated_at = now()
+  where state = 'PENDING'
+    and expires_at is not null
+    and expires_at <= now();
+
+  get diagnostics check_count = row_count;
+
+  return query select check_count, request_count;
+end;
+$$;
+
+revoke all on function public.expire_pending_checks()
 from public, anon, authenticated;

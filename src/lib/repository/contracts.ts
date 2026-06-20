@@ -76,6 +76,15 @@ export interface PhoneAlertRepository {
   getInternalByCallHash(callSidHash: string): Promise<PhoneAlertRecord | null>;
 }
 
+export type ExpiryResult = {
+  expiredChecks: number;
+  expiredRequests: number;
+};
+
+export interface ExpiryRepository {
+  expirePendingChecks(): Promise<ExpiryResult>;
+}
+
 export interface HouseholdRepository {
   getInternalById(id: string): Promise<HouseholdRecord | null>;
 }
@@ -192,6 +201,7 @@ export interface CircleCheckRepositories {
   verificationRequests: VerificationRequestRepository;
   enrollmentVerifications: EnrollmentVerificationRepository;
   phoneAlerts: PhoneAlertRepository;
+  expiry: ExpiryRepository;
   households: HouseholdRepository;
   resetDemo?: () => Promise<void>;
 }

@@ -124,6 +124,35 @@ export function getCheck(id: string): CheckRecord | null {
   return structuredClone(check);
 }
 
+export function expirePendingChecks() {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  let expiredChecks = 0;
+  let expiredRequests = 0;
+
+  for (const request of store.requests.values()) {
+    if (
+      request.status !== "PENDING" ||
+      Date.parse(request.expiresAt) > now.getTime()
+    ) {
+      continue;
+    }
+
+    request.status = "EXPIRED";
+    expiredRequests += 1;
+
+    const check = store.checks.get(request.checkId);
+    if (check?.state === "PENDING") {
+      check.state = transitionCheck(check.state, "EXPIRED");
+      check.updatedAt = nowIso;
+      check.statusSource = "SYSTEM_EXPIRY";
+      expiredChecks += 1;
+    }
+  }
+
+  return { expiredChecks, expiredRequests };
+}
+
 function toPublicCheck(check: CheckRecord): PublicCheckRecord {
   const signals = Object.fromEntries(
     Object.entries(check.extraction.signals).map(([name, signal]) => [
@@ -338,6 +367,11 @@ export function createDemoRepositories(): CircleCheckRepositories {
       async getInternalById(id) {
         const request = store.requests.get(id);
         return request ? structuredClone(request) : null;
+      },
+    },
+    expiry: {
+      async expirePendingChecks() {
+        return expirePendingChecks();
       },
     },
     phoneAlerts: {
