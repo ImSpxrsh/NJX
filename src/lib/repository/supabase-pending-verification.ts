@@ -43,6 +43,8 @@ export class SupabasePendingVerificationDataSource implements PendingVerificatio
       .select("id")
       .eq("household_id", householdId)
       .not("destination_verified_at", "is", null)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(1)
       .maybeSingle();
     if (error) throw new Error("Unable to select trusted contact.");

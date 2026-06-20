@@ -1,5 +1,5 @@
 begin;
-select plan(9);
+select plan(11);
 
 insert into public.households (id, display_name) values
   ('10000000-0000-4000-8000-000000000001', 'Household A'),
@@ -161,6 +161,26 @@ select is(
   (select count(*)::integer from public.verification_requests where check_id = '10000000-0000-4000-8000-000000000023'),
   0,
   'failed creation leaves no partial request'
+);
+
+select is(
+  has_function_privilege(
+    'anon',
+    'public.create_pending_verification(uuid,uuid,text,timestamptz)',
+    'EXECUTE'
+  ),
+  false,
+  'anonymous role cannot execute verification creation'
+);
+
+select is(
+  has_function_privilege(
+    'service_role',
+    'public.create_pending_verification(uuid,uuid,text,timestamptz)',
+    'EXECUTE'
+  ),
+  true,
+  'service role can execute verification creation'
 );
 
 select * from finish();

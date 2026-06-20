@@ -44,7 +44,8 @@ begin
   into contact_household_id
   from public.trusted_contacts
   where id = target_trusted_contact_id
-    and destination_verified_at is not null;
+    and destination_verified_at is not null
+  for share;
 
   if not found or contact_household_id <> locked_check.household_id then
     raise exception 'Trusted contact unavailable';
