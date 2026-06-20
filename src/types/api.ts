@@ -1,6 +1,8 @@
 import type {
   CheckState,
   DestinationVerificationChannel,
+  EnrollmentChannel,
+  EnrollmentVerificationStatusView,
   EvidenceExtraction,
   PolicyDecision,
   PublicEvidenceSignal,
@@ -9,7 +11,7 @@ import type {
   VerificationLevel,
 } from "./domain";
 
-export type AnalyzeResponse = {
+export type AnalyzeProductionResponse = {
   checkId: string;
   state: "PAUSED" | "PENDING";
   extraction: EvidenceExtraction;
@@ -17,9 +19,21 @@ export type AnalyzeResponse = {
   verification?: {
     requestId: string;
     expiresAt: string;
-    demoContactUrl?: string;
   };
 };
+
+export type AnalyzeDemoResponse = Omit<
+  AnalyzeProductionResponse,
+  "verification"
+> & {
+  verification?: {
+    requestId: string;
+    expiresAt: string;
+    demoContactUrl: string;
+  };
+};
+
+export type AnalyzeResponse = AnalyzeProductionResponse | AnalyzeDemoResponse;
 
 export type CheckStatusResponse = {
   checkId: string;
@@ -63,3 +77,28 @@ export type StartDestinationVerificationResponse = {
   // analyze's demoContactUrl. Never set in production.
   demoCode?: string;
 };
+// --- Enrollment destination verification (CC-202) ---
+
+export type CreateContactResponse = {
+  contactId: string;
+  channel: EnrollmentChannel;
+  destinationVerified: false;
+};
+
+export type EnrollmentStartResponse = {
+  verificationId: string;
+  channel: EnrollmentChannel;
+  expiresAt: string;
+  demoMode: boolean;
+  /** Present only when enrollment demo mode is explicitly enabled. */
+  demo?: {
+    notice: string;
+    channel: EnrollmentChannel;
+    code?: string;
+    verifyUrl?: string;
+  };
+};
+
+export type EnrollmentConfirmResponse = { ok: boolean };
+
+export type EnrollmentStatusResponse = EnrollmentVerificationStatusView;

@@ -7,8 +7,11 @@ messages, contact destinations, or service credentials.
 
 Input: `{ householdId: uuid, message: string, mode?: "fixture"|"llm" }`.
 Returns the check ID, PAUSED/PENDING state, validated extraction, deterministic
-decision, and optional request metadata. In demo mode only, it also returns a
-clearly labeled contact URL to simulate delivery.
+decision, and optional non-secret request metadata.
+
+Production uses a strict response schema that has no demo URL or raw-token
+field. Explicit demo runtime uses a separate strict schema and may include
+`verification.demoContactUrl` to simulate delivery.
 
 ## `GET /api/checks/:id`
 
@@ -28,7 +31,7 @@ check PENDING. Every response consumes the link once.
 
 ## `POST /api/twilio/voice`
 
-Validates the Twilio signature when configured and returns TwiML containing a
+Verifies the Twilio signature (see below) and returns TwiML containing a
 one-digit Gather. It configures no recording or transcription.
 
 ## `POST /api/twilio/gather`
@@ -92,8 +95,55 @@ or mismatched codes never verify (400); too many attempts lock the challenge
 High-trust gate. Returns `{ eligible: true, contact }` only when the destination
 is already verified; otherwise 403. Unverified destinations never receive a
 high-trust verification request.
+### Twilio signature verification (CC-206)
+
+Both Twilio routes verify the request before any processing. The signature is
+checked against the reconstructed public URL (pinned via `TWILIO_PUBLIC_BASE_URL`
+or `PUBLIC_APP_URL`, else forwarded headers). Missing, invalid, and
+not-configured cases all return a generic `403 Forbidden` with no side effects.
+Unsigned requests are permitted only with an explicit non-production
+`TWILIO_ALLOW_UNSIGNED=true`; production with no auth token fails closed. See
+`docs/twilio-security.md`.
+
+## Enrollment destination verification (CC-202)
+
+These endpoints are separate from request verification and never accept or return
+request-verification tokens. All responses are `no-store`.
+
+### `POST /api/enrollment/contacts`
+
+Input: `{ householdId: uuid, displayName, channel: "sms"|"email", destination }`.
+Creates a trusted contact with an **unverified** destination (E.164 / email
+normalized). Returns `{ contactId, channel, destinationVerified: false }`.
+
+### `PUT /api/enrollment/contacts`
+
+Input: `{ trustedContactId: uuid, channel, destination }`. Replaces the
+destination, clears prior verification, and invalidates any pending secret.
+Unknown contacts and invalid destinations share a generic 400.
+
+### `POST /api/enrollment/verify/start`
+
+Input: `{ householdId: uuid, trustedContactId: uuid }`. Issues a one-time secret
+for the contact's stored destination. Returns `{ verificationId, channel,
+expiresAt, demoMode }`. The raw secret is included only when enrollment demo mode
+is explicitly enabled. Rate-limited (429). Unknown contact and invalid
+destination share a generic 400.
+
+### `POST /api/enrollment/verify/confirm`
+
+Input: `{ token }` (email link) **or** `{ trustedContactId: uuid, code }` (SMS).
+Returns `{ ok: true }` on success. Every failure is an indistinguishable generic
+409 (`{ ok: false }`); throttling is 429. The response never reveals whether a
+token existed, expired, was used, or is locked.
+
+### `GET /api/enrollment/status?trustedContactId=...`
+
+Returns `{ trustedContactId, channel, status, destinationVerified, expiresAt }`.
+Never includes the destination value or any secret. Unknown ids receive a 404.
 
 ## `POST /api/demo/reset`
 
-Clears process-local demo state. This route must be disabled or authenticated
-before a public production deployment.
+Clears process-local demo state only in explicit demo runtime after a
+same-origin check. It returns 404 before repository access in production,
+development, and test runtime by default.

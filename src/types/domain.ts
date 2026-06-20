@@ -144,3 +144,44 @@ export type PhoneAlertRecord = {
   pressedDigit: "1";
   createdAt: string;
 };
+
+/**
+ * Enrollment destination verification (CC-202). This is a separate subsystem
+ * from request verification (`VerificationRequestRecord`): separate token
+ * purpose, separate table, separate repository, separate API, separate audit.
+ */
+export type EnrollmentChannel = "sms" | "email";
+
+export type EnrollmentVerificationStatus =
+  | "PENDING"
+  | "VERIFIED"
+  | "EXPIRED"
+  | "LOCKED";
+
+export type EnrollmentVerificationRecord = {
+  id: string;
+  householdId: string;
+  trustedContactId: string;
+  channel: EnrollmentChannel;
+  // Internal only. Never returned in public/status reads, never logged.
+  destination: string;
+  // Purpose-bound hash of the code/link token. The raw secret is never stored.
+  secretHash: string;
+  status: EnrollmentVerificationStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  resendCount: number;
+  expiresAt: string;
+  consumedAt: string | null;
+  lastAttemptAt: string | null;
+  createdAt: string;
+};
+
+/** Public-safe projection: no destination, no secret hash, no household id. */
+export type EnrollmentVerificationStatusView = {
+  trustedContactId: string;
+  channel: EnrollmentChannel;
+  status: EnrollmentVerificationStatus;
+  destinationVerified: boolean;
+  expiresAt: string;
+};
