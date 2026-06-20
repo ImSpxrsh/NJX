@@ -58,3 +58,13 @@ only by single-use consumption of a short-lived, hashed secret inside the truste
 server boundary; any failure leaves it unverified. See
 `docs/enrollment-verification.md` for the token lifecycle, data handling, and
 demo-mode rules.
+
+## Notification delivery
+
+The provider-neutral notification service (CC-203) delivers enrollment secrets
+over pluggable SMS/email adapters. It depends only on a `NotificationProvider`
+interface and a sanitized payload type, applies bounded exponential backoff with
+idempotent retries, and logs only coarse redacted fields. Crucially, delivery is
+separate from identity: `DELIVERED` is never `CONFIRMED` or `VERIFIED`, and a
+delivery failure leaves the check `PENDING` with manual callback guidance. See
+`docs/notification-architecture.md`.

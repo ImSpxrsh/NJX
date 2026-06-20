@@ -60,3 +60,23 @@ export type EnrollmentStartResponse = {
 export type EnrollmentConfirmResponse = { ok: boolean };
 
 export type EnrollmentStatusResponse = EnrollmentVerificationStatusView;
+
+// --- Trusted-contact notification delivery (CC-203) ---
+
+export type EnrollmentSendResponse = {
+  verificationId: string;
+  channel: EnrollmentChannel;
+  expiresAt: string;
+  // Delivery state is independent of verification state. DELIVERED is not
+  // CONFIRMED and is not VERIFIED.
+  delivery: { status: "DELIVERED" | "FAILED" };
+  /** Present only when delivery failed. */
+  manualCallback?: string;
+  demoMode: boolean;
+  demo?: {
+    notice: string;
+    channel: EnrollmentChannel;
+    code?: string;
+    verifyUrl?: string;
+  };
+};

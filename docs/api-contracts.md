@@ -73,6 +73,15 @@ token existed, expired, was used, or is locked.
 Returns `{ trustedContactId, channel, status, destinationVerified, expiresAt }`.
 Never includes the destination value or any secret. Unknown ids receive a 404.
 
+### `POST /api/enrollment/verify/send` (CC-203)
+
+Input: `{ householdId: uuid, trustedContactId: uuid }`. Issues an enrollment
+secret and delivers it through the notification service. Returns
+`{ verificationId, channel, expiresAt, delivery: { status }, demoMode }`, plus
+`manualCallback` guidance when delivery fails. The secret is never in the
+response outside demo mode. Delivery status is independent of verification
+state — `DELIVERED` is not `VERIFIED`.
+
 ## `POST /api/demo/reset`
 
 Clears process-local demo state. This route must be disabled or authenticated
