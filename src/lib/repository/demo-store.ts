@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type {
   CheckRecord,
+  EnrollmentVerificationRecord,
   HouseholdRecord,
   PhoneAlertRecord,
   PublicCheckRecord,
@@ -17,28 +18,36 @@ import {
 } from "@/lib/security/tokens";
 import { sha256 } from "@/lib/security/hashing";
 import type { CircleCheckRepositories, VerificationContext } from "./contracts";
+import {
+  createEnrollmentDemoRepository,
+  resetEnrollmentDemo,
+} from "./enrollment-demo-store";
 
-type Store = {
+export type DemoStore = {
   checks: Map<string, CheckRecord>;
   requests: Map<string, VerificationRequestRecord>;
   phoneCallIds: Set<string>;
   phoneAlerts: Map<string, PhoneAlertRecord>;
+  contacts: Map<string, TrustedContactRecord>;
+  enrollments: Map<string, EnrollmentVerificationRecord>;
 };
 
 const globalStore = globalThis as typeof globalThis & {
-  circleCheckStore?: Store;
+  circleCheckStore?: DemoStore;
 };
 
-const store =
+export const store =
   globalStore.circleCheckStore ??
   (globalStore.circleCheckStore = {
     checks: new Map(),
     requests: new Map(),
     phoneCallIds: new Set(),
     phoneAlerts: new Map(),
+    contacts: new Map(),
+    enrollments: new Map(),
   });
 
-const householdId =
+export const householdId =
   process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001";
 const contactId =
   process.env.DEMO_TRUSTED_CONTACT_ID ?? "00000000-0000-4000-8000-000000000002";
@@ -246,6 +255,9 @@ export function resetDemo() {
   store.requests.clear();
   store.phoneCallIds.clear();
   store.phoneAlerts.clear();
+  store.enrollments.clear();
+  resetEnrollmentDemo();
+  seedContacts();
 }
 
 const demoHousehold: HouseholdRecord = {
@@ -264,6 +276,13 @@ const demoContact: TrustedContactRecord = {
   destinationVerifiedAt: new Date(0).toISOString(),
   createdAt: new Date(0).toISOString(),
 };
+
+/** (Re)seed the canonical demo contact. Idempotent. */
+export function seedContacts(): void {
+  store.contacts.set(demoContact.id, structuredClone(demoContact));
+}
+
+seedContacts();
 
 export function createDemoRepositories(): CircleCheckRepositories {
   return {
@@ -292,12 +311,23 @@ export function createDemoRepositories(): CircleCheckRepositories {
     },
     trustedContacts: {
       async getInternalById(id) {
-        return id === demoContact.id ? structuredClone(demoContact) : null;
+        const contact = store.contacts.get(id);
+        return contact ? structuredClone(contact) : null;
       },
       async getVerifiedForHousehold(id) {
-        return id === householdId ? structuredClone(demoContact) : null;
+        // Only a destination-verified contact may receive a high-trust request.
+        for (const contact of store.contacts.values()) {
+          if (
+            contact.householdId === id &&
+            contact.destinationVerifiedAt !== null
+          ) {
+            return structuredClone(contact);
+          }
+        }
+        return null;
       },
     },
+    enrollmentVerifications: createEnrollmentDemoRepository(),
     verificationRequests: {
       async getContext(rawToken) {
         return getVerificationContext(rawToken);
