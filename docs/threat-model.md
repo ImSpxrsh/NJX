@@ -20,10 +20,33 @@ number, or both physical challenge-card copies.
 - No raw-message persistence.
 - CSPRNG, hashed, expiring, single-use tokens.
 - Atomic database token consumption and state transition.
-- Signed Twilio webhooks when credentials are configured.
+- Signed Twilio webhooks validated against the reconstructed public URL, failing
+  closed in production when no auth token is configured.
 - No audio recording or transcription.
 - Short polling returns minimal, source-labeled status.
 - Failures preserve the instruction to stop and use a known number.
+
+## Twilio webhook signature (CC-206)
+
+The webhook signature is the only caller authentication for the phone flow.
+
+- **Forgery** — only a holder of the auth token can produce a valid HMAC-SHA1
+  signature; unsigned/invalid requests get a generic 403 and no side effects.
+- **URL reconstruction** — the signed public URL is rebuilt from a pinned base
+  (`TWILIO_PUBLIC_BASE_URL`/`PUBLIC_APP_URL`) or forwarded headers; path and query
+  come from the request, so behind Vercel/proxies valid signatures verify and
+  tampering fails.
+- **Header spoofing** — a pinned base URL ignores forwarded headers entirely;
+  even without it, spoofing host/scheme cannot yield a matching signature.
+- **Tampering / replacement / stripping** — body, query, signature, and
+  content-type changes all invalidate verification.
+- **Fail-open misconfiguration** — production with no auth token rejects all
+  webhooks (`NOT_CONFIGURED`); unsigned requests are allowed only with an
+  explicit non-production flag.
+- **Logging** — only a coarse failure code is logged; never the token, signature,
+  URL, or params.
+
+See `docs/twilio-security.md`.
 
 ## Enrollment destination verification (CC-202)
 
