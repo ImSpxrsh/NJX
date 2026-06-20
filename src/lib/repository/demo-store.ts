@@ -193,6 +193,17 @@ export function respondToVerification(
     }
     return { ok: false as const, code: "EXPIRED" as const };
   }
+  if (check.state !== "PENDING") {
+    return { ok: false as const, code: "ALREADY_USED" as const };
+  }
+  const superseded = [...store.requests.values()].some(
+    (candidate) =>
+      candidate.checkId === request.checkId &&
+      Date.parse(candidate.createdAt) > Date.parse(request.createdAt),
+  );
+  if (superseded) {
+    return { ok: false as const, code: "ALREADY_USED" as const };
+  }
 
   const now = new Date().toISOString();
   request.response = response;
@@ -219,10 +230,7 @@ export function respondToVerification(
   return {
     ok: true as const,
     state: check.state,
-    message:
-      check.state === "VERIFIED"
-        ? "The enrolled contact confirmed making this request."
-        : "The enrolled contact denied making this request.",
+    message: "Verification response recorded.",
   };
 }
 

@@ -79,36 +79,60 @@ alter table public.phone_alerts enable row level security;
 create or replace function public.consume_verification_token(
   supplied_token text,
   supplied_response public.verification_response
-) returns table(result_state public.check_state, result_message text)
+) returns table(result_status text, result_state public.check_state, result_message text)
 language plpgsql
 security definer
 set search_path = public, extensions
 as $$
 declare
-  matched_request public.verification_requests%rowtype;
+  matched_request_id uuid;
+  matched_check_id uuid;
   next_state public.check_state;
 begin
-  select * into matched_request
-  from public.verification_requests
-  where token_hash = encode(digest(supplied_token, 'sha256'), 'hex')
-    and status = 'PENDING'
-    and used_at is null
-    and expires_at > now()
-  for update;
-
-  if not found then
-    raise exception 'Verification request unavailable';
+  if supplied_token is null or supplied_token !~ '^[A-Za-z0-9_-]{43}$' then
+    return query select
+      'REJECTED',
+      null::public.check_state,
+      'Verification response was not accepted';
+    return;
   end if;
 
-  update public.verification_requests
-  set response = supplied_response,
-      responded_at = now(),
-      used_at = now(),
-      status = 'COMPLETED'
-  where id = matched_request.id;
+  select vr.id, vr.check_id into matched_request_id, matched_check_id
+  from public.verification_requests vr
+  join public.checks c on c.id = vr.check_id
+  where vr.token_hash = encode(digest(supplied_token, 'sha256'), 'hex')
+    and vr.status = 'PENDING'
+    and vr.used_at is null
+    and vr.expires_at > now()
+    and c.state = 'PENDING'
+    and not exists (
+      select 1
+      from public.verification_requests newer
+      where newer.check_id = vr.check_id
+        and newer.created_at > vr.created_at
+    )
+  for update of vr, c;
+
+  if not found then
+    return query select
+      'REJECTED',
+      null::public.check_state,
+      'Verification response was not accepted';
+    return;
+  end if;
 
   if supplied_response = 'CALL_ME' then
-    return query select 'PENDING'::public.check_state, 'Callback requested';
+    update public.verification_requests
+    set response = supplied_response,
+        responded_at = now(),
+        used_at = now(),
+        status = 'COMPLETED'
+    where id = matched_request_id;
+
+    return query select
+      'ACCEPTED',
+      'PENDING'::public.check_state,
+      'Verification response recorded';
     return;
   end if;
 
@@ -119,13 +143,27 @@ begin
 
   update public.checks
   set state = next_state, updated_at = now()
-  where id = matched_request.check_id and state = 'PENDING';
+  where id = matched_check_id and state = 'PENDING';
 
   if not found then
-    raise exception 'Check is not pending';
+    return query select
+      'REJECTED',
+      null::public.check_state,
+      'Verification response was not accepted';
+    return;
   end if;
 
-  return query select next_state, 'Contact response recorded';
+  update public.verification_requests
+  set response = supplied_response,
+      responded_at = now(),
+      used_at = now(),
+      status = 'COMPLETED'
+  where id = matched_request_id;
+
+  return query select
+    'ACCEPTED',
+    next_state,
+    'Verification response recorded';
 end;
 $$;
 
