@@ -4,19 +4,26 @@ import {
   resetRepositoryFactoryForTests,
 } from "@/lib/repository/factory";
 import { resetDemo } from "@/lib/repository/demo-store";
+import { resetRuntimeConfigForTests } from "@/lib/runtime-config";
 import { POST } from "./route";
 
 const HH = "33333333-3333-4333-8333-333333333333";
 const savedEnv = { ...process.env };
 
 beforeEach(() => {
-  process.env = { ...savedEnv, CIRCLECHECK_REPOSITORY_MODE: "demo" };
+  process.env = {
+    ...savedEnv,
+    CIRCLECHECK_RUNTIME_MODE: "demo",
+    CIRCLECHECK_REPOSITORY_MODE: "demo",
+  };
+  resetRuntimeConfigForTests();
   resetRepositoryFactoryForTests();
   resetDemo();
 });
 
 afterEach(() => {
   process.env = { ...savedEnv };
+  resetRuntimeConfigForTests();
   resetRepositoryFactoryForTests();
 });
 

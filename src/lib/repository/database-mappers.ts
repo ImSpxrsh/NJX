@@ -151,6 +151,11 @@ const trustedContactRowSchema = z
     email: z.string().nullable(),
     channel: z.enum(["sms", "email", "manual_demo"]),
     destination_verified_at: nullableTimestamp,
+    destination_verified_channel: z
+      .enum(["sms", "email"])
+      .nullable()
+      .optional(),
+    updated_at: isoTimestamp.optional(),
     created_at: isoTimestamp,
   })
   .strict()
@@ -168,6 +173,8 @@ export function mapTrustedContactRow(row: unknown): TrustedContactRecord {
     email: parsed.email,
     channel: parsed.channel,
     destinationVerifiedAt: parsed.destination_verified_at,
+    destinationVerifiedChannel: parsed.destination_verified_channel ?? null,
+    updatedAt: parsed.updated_at ?? parsed.created_at,
     createdAt: parsed.created_at,
   };
 }
@@ -210,6 +217,7 @@ const phoneAlertRowSchema = z
     id: z.string().uuid(),
     household_id: z.string().uuid(),
     check_id: z.string().uuid(),
+    verification_request_id: z.string().uuid().optional(),
     twilio_call_sid_hash: z.string().length(64),
     pressed_digit: z.literal("1"),
     created_at: isoTimestamp,
@@ -222,6 +230,8 @@ export function mapPhoneAlertRow(row: unknown): PhoneAlertRecord {
     id: parsed.id,
     householdId: parsed.household_id,
     checkId: parsed.check_id,
+    verificationRequestId:
+      parsed.verification_request_id ?? "00000000-0000-4000-8000-000000000000",
     callSidHash: parsed.twilio_call_sid_hash,
     pressedDigit: parsed.pressed_digit,
     createdAt: parsed.created_at,

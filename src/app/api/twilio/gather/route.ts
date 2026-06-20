@@ -3,7 +3,9 @@ import twilio from "twilio";
 import { verifyTwilioRequest } from "@/lib/security/twilio-webhook";
 import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
+import { logSecurityEvent } from "@/lib/observability/logger";
 import { getRepositories } from "@/lib/repository/factory";
+import { rateLimit } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
   const verification = await verifyTwilioRequest(request);
@@ -13,6 +15,30 @@ export async function POST(request: Request) {
   }
   const params = verification.params;
   const response = new twilio.twiml.VoiceResponse();
+  const limited = rateLimit({
+    name: "twilio-gather",
+    key: `${params.CallSid ?? "missing-call"}:${params.From ?? "unknown-caller"}`,
+    limit: 5,
+    windowMs: 60_000,
+  });
+  if (!limited.allowed) {
+    logSecurityEvent({
+      route: "/api/twilio/gather",
+      outcome: "rate_limited",
+      provider: "twilio",
+      code: "RATE_LIMITED",
+    });
+    response.say(
+      "Do not send anything yet. Hang up and call the trusted number printed on your CircleCheck card.",
+    );
+    return new NextResponse(response.toString(), {
+      status: 429,
+      headers: {
+        "Content-Type": "text/xml",
+        "Retry-After": String(limited.retryAfterSeconds),
+      },
+    });
+  }
   if (params.Digits !== "1") {
     response.say(
       "No alert was created. Hang up and call the trusted number printed on your CircleCheck card.",

@@ -168,7 +168,11 @@ export interface VerificationNotificationRepository {
     rawToken: string;
     appUrl: string;
   }): Promise<VerificationNotification>;
-  getInternalByRequestId(requestId: string): Promise<VerificationNotification | null>;
+  getInternalByRequestId(
+    requestId: string,
+  ): Promise<VerificationNotification | null>;
+}
+
 export type ExpiryResult = {
   expiredChecks: number;
   expiredRequests: number;

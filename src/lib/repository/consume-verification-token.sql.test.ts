@@ -8,10 +8,10 @@ const migration = readFileSync(
 );
 
 const functionBody = migration.slice(
-  migration.indexOf("create or replace function public.consume_verification_token"),
   migration.indexOf(
-    "revoke all on function public.consume_verification_token",
+    "create or replace function public.consume_verification_token",
   ),
+  migration.indexOf("revoke all on function public.consume_verification_token"),
 );
 
 describe("consume_verification_token migration", () => {
@@ -39,9 +39,14 @@ describe("phone caller mapping migration", () => {
     expect(migration).toContain(
       "alter table public.phone_caller_mappings enable row level security",
     );
+  });
+});
+
 describe("expire_pending_checks migration", () => {
   const functionBody = migration.slice(
-    migration.indexOf("create or replace function public.expire_pending_checks"),
+    migration.indexOf(
+      "create or replace function public.expire_pending_checks",
+    ),
     migration.indexOf("revoke all on function public.expire_pending_checks"),
   );
 

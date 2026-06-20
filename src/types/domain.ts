@@ -158,6 +158,8 @@ export type PhoneAlertRecord = {
 
 export type PhoneCallerRoute = {
   householdId: string;
+};
+
 /**
  * Enrollment destination verification (CC-202). This is a separate subsystem
  * from request verification (`VerificationRequestRecord`): separate token

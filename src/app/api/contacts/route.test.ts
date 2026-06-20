@@ -1,13 +1,16 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { resetDemo } from "@/lib/repository/demo-store";
 import { resetRepositoryFactoryForTests } from "@/lib/repository/factory";
+import { resetRuntimeConfigForTests } from "@/lib/runtime-config";
 import { GET, POST } from "./route";
 
 beforeAll(() => {
+  process.env.CIRCLECHECK_RUNTIME_MODE = "demo";
   process.env.CIRCLECHECK_REPOSITORY_MODE = "demo";
 });
 
 beforeEach(() => {
+  resetRuntimeConfigForTests();
   resetRepositoryFactoryForTests();
   resetDemo();
 });

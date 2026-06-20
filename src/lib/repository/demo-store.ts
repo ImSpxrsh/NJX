@@ -4,15 +4,16 @@ import type {
   CheckRecord,
   ContactDestinationVerificationRecord,
   EnrollmentVerificationRecord,
+  EvidenceExtraction,
   HouseholdRecord,
   PhoneAlertRecord,
   PhoneCallerRoute,
+  PolicyDecision,
   PublicCheckRecord,
   TrustedContactRecord,
   VerificationRequestRecord,
   VerificationResponse,
 } from "@/types/domain";
-import type { EvidenceExtraction, PolicyDecision } from "@/types/domain";
 import { transitionCheck } from "@/lib/state/check-state-machine";
 import {
   createVerificationToken,
@@ -20,15 +21,13 @@ import {
 } from "@/lib/security/tokens";
 import { sha256 } from "@/lib/security/hashing";
 import { normalizePhoneE164 } from "@/lib/security/phone";
-import type { CircleCheckRepositories, VerificationContext } from "./contracts";
-import type { VerificationNotification } from "./contracts";
 import type {
   CircleCheckRepositories,
   ContactWriteInput,
   DestinationChallengeInput,
   VerificationContext,
+  VerificationNotification,
 } from "./contracts";
-import type { CircleCheckRepositories, VerificationContext } from "./contracts";
 import {
   createEnrollmentDemoRepository,
   resetEnrollmentDemo,
@@ -42,18 +41,19 @@ export type DemoStore = {
   verificationNotifications: Map<string, VerificationNotification>;
   contacts: Map<string, TrustedContactRecord>;
   destinationChallenges: Map<string, ContactDestinationVerificationRecord>;
+  enrollments: Map<string, EnrollmentVerificationRecord>;
 };
 
-const householdId =
+export const householdId =
   process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001";
 const contactId =
   process.env.DEMO_TRUSTED_CONTACT_ID ?? "00000000-0000-4000-8000-000000000002";
+const defaultCallerPhone = "+15555550100";
 
 const demoHousehold: HouseholdRecord = {
   id: householdId,
   displayName: "CircleCheck Demo Household",
   createdAt: new Date(0).toISOString(),
-  enrollments: Map<string, EnrollmentVerificationRecord>;
 };
 
 function buildDemoContact(): TrustedContactRecord {
@@ -71,21 +71,14 @@ function buildDemoContact(): TrustedContactRecord {
   };
 }
 
-function seedContacts(target: Map<string, TrustedContactRecord>) {
+function seedContactsInto(target: Map<string, TrustedContactRecord>): void {
   target.set(contactId, buildDemoContact());
 }
 
-const globalStore = globalThis as typeof globalThis & {
-  circleCheckStore?: DemoStore;
-};
-
-function createStore(): Store {
+function createStore(): DemoStore {
   const contacts = new Map<string, TrustedContactRecord>();
-  seedContacts(contacts);
+  seedContactsInto(contacts);
   return {
-export const store =
-  globalStore.circleCheckStore ??
-  (globalStore.circleCheckStore = {
     checks: new Map(),
     requests: new Map(),
     phoneCallIds: new Set(),
@@ -93,21 +86,21 @@ export const store =
     verificationNotifications: new Map(),
     contacts,
     destinationChallenges: new Map(),
+    enrollments: new Map(),
   };
 }
 
-const store =
+const globalStore = globalThis as typeof globalThis & {
+  circleCheckStore?: DemoStore;
+};
+
+export const store =
   globalStore.circleCheckStore ??
   (globalStore.circleCheckStore = createStore());
-    contacts: new Map(),
-    enrollments: new Map(),
-  });
 
-export const householdId =
-  process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001";
-const contactId =
-  process.env.DEMO_TRUSTED_CONTACT_ID ?? "00000000-0000-4000-8000-000000000002";
-const defaultCallerPhone = "+15555550100";
+export function seedContacts(): void {
+  seedContactsInto(store.contacts);
+}
 
 export function createCheck(input: {
   extraction: EvidenceExtraction;
@@ -284,6 +277,7 @@ export function respondToVerification(
     request.status = "EXPIRED";
     if (check.state === "PENDING") {
       check.state = transitionCheck(check.state, "EXPIRED");
+      check.updatedAt = new Date().toISOString();
       check.statusSource = "SYSTEM_EXPIRY";
     }
     return { ok: false as const, code: "EXPIRED" as const };
@@ -303,10 +297,10 @@ export function respondToVerification(
   const now = new Date().toISOString();
   request.response = response;
   request.respondedAt = now;
+  request.usedAt = now;
+  request.status = "COMPLETED";
 
   if (response === "CALL_ME") {
-    request.usedAt = now;
-    request.status = "COMPLETED";
     return {
       ok: true as const,
       state: "PENDING" as const,
@@ -314,10 +308,6 @@ export function respondToVerification(
     };
   }
 
-  request.usedAt = now;
-  request.status = "COMPLETED";
-  // Narrow terminal state up front so the returned `state` is the contract's
-  // "VERIFIED" | "DENIED" rather than the wider CheckState.
   const terminalState =
     response === "CONFIRMED_MINE" ? ("VERIFIED" as const) : ("DENIED" as const);
   check.state = transitionCheck(check.state, terminalState);
@@ -330,8 +320,6 @@ export function respondToVerification(
       terminalState === "VERIFIED"
         ? "The enrolled contact confirmed making this request."
         : "The enrolled contact denied making this request.",
-    state: check.state,
-    message: "Verification response recorded.",
   };
 }
 
@@ -408,17 +396,12 @@ export function resetDemo() {
   store.verificationNotifications.clear();
   store.contacts.clear();
   store.destinationChallenges.clear();
-  seedContacts(store.contacts);
   store.enrollments.clear();
-  resetEnrollmentDemo();
   seedContacts();
+  resetEnrollmentDemo();
 }
 
-// --- Trusted-contact enrollment (CC-101) ----------------------------------
-
 function requireDemoHousehold(id: string) {
-  // Demo mode serves exactly one household. Reject anything else at the
-  // repository boundary, mirroring checks.create's behavior.
   if (id !== householdId) {
     throw new Error("Demo household unavailable.");
   }
@@ -441,7 +424,6 @@ function createContact(input: ContactWriteInput): TrustedContactRecord {
     phoneE164: input.phoneE164,
     email: input.email,
     channel: input.channel,
-    // Enrollment NEVER produces a verified destination.
     destinationVerifiedAt: null,
     destinationVerifiedChannel: null,
     createdAt: now,
@@ -464,14 +446,11 @@ function updateContact(
     phoneE164: input.phoneE164,
     email: input.email,
     channel: input.channel,
-    // SECURITY: any modification clears prior verification state so a changed
-    // phone/email must be re-verified.
     destinationVerifiedAt: null,
     destinationVerifiedChannel: null,
     updatedAt: now,
   };
   store.contacts.set(id, updated);
-  // Outstanding challenges for this contact are no longer valid.
   for (const challenge of store.destinationChallenges.values()) {
     if (challenge.trustedContactId === id) challenge.consumed = true;
   }
@@ -487,12 +466,9 @@ function removeContact(id: string): void {
   }
 }
 
-// --- Destination verification (separate workflow) -------------------------
-
 function createDestinationChallenge(
   input: DestinationChallengeInput,
 ): ContactDestinationVerificationRecord {
-  // Invalidate any prior active challenge so only the newest code can succeed.
   for (const challenge of store.destinationChallenges.values()) {
     if (challenge.trustedContactId === input.trustedContactId) {
       challenge.consumed = true;
@@ -524,13 +500,6 @@ function getActiveChallenge(
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return active.length ? structuredClone(active[0]) : null;
 }
-
-/** (Re)seed the canonical demo contact. Idempotent. */
-export function seedContacts(): void {
-  store.contacts.set(demoContact.id, structuredClone(demoContact));
-}
-
-seedContacts();
 
 export function createDemoRepositories(): CircleCheckRepositories {
   return {
@@ -603,8 +572,6 @@ export function createDemoRepositories(): CircleCheckRepositories {
         if (challenge) challenge.consumed = true;
       },
       async completeChallenge(input) {
-        // Atomic in production (a SECURITY DEFINER function); trivially atomic
-        // here. Consume the challenge and mark the destination verified.
         const challenge = store.destinationChallenges.get(input.challengeId);
         if (challenge) challenge.consumed = true;
         const contact = store.contacts.get(input.trustedContactId);
@@ -621,16 +588,6 @@ export function createDemoRepositories(): CircleCheckRepositories {
             challenge.householdId === id &&
             Date.parse(challenge.createdAt) >= since,
         ).length;
-        // Only a destination-verified contact may receive a high-trust request.
-        for (const contact of store.contacts.values()) {
-          if (
-            contact.householdId === id &&
-            contact.destinationVerifiedAt !== null
-          ) {
-            return structuredClone(contact);
-          }
-        }
-        return null;
       },
     },
     enrollmentVerifications: createEnrollmentDemoRepository(),

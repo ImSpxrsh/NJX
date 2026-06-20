@@ -3,6 +3,7 @@ import {
   buildTwilioRequest,
   signTwilioRequest,
 } from "@/lib/security/twilio-test-helpers";
+import { resetRateLimitsForTests } from "@/lib/security/rate-limit";
 import { POST } from "./route";
 
 const TOKEN = "voice-route-token-cccccccccccccccccccc";
@@ -16,10 +17,12 @@ beforeEach(() => {
     TWILIO_AUTH_TOKEN: TOKEN,
     TWILIO_PUBLIC_BASE_URL: BASE,
   };
+  resetRateLimitsForTests();
 });
 
 afterEach(() => {
   process.env = { ...savedEnv };
+  resetRateLimitsForTests();
 });
 
 function signed() {
@@ -65,5 +68,16 @@ describe("POST /api/twilio/voice", () => {
       }),
     );
     expect(response.status).toBe(403);
+  });
+
+  it("rate limits repeated valid callbacks with safe TwiML", async () => {
+    for (let i = 0; i < 10; i += 1) {
+      await POST(signed());
+    }
+    const response = await POST(signed());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBeTruthy();
+    expect(await response.text()).toContain("call a number you know");
   });
 });

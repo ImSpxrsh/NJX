@@ -193,6 +193,8 @@ export function createEnrollmentDemoRepository(): EnrollmentVerificationReposito
         channel: normalized.destination.channel,
         // A submitted destination is never verified merely by being submitted.
         destinationVerifiedAt: null,
+        destinationVerifiedChannel: null,
+        updatedAt: now,
         createdAt: now,
       };
       store.contacts.set(contact.id, contact);
