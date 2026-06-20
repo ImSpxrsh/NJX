@@ -52,6 +52,13 @@ export function toPausedCheckInsert(
   };
 }
 
+const statusSource = z.enum([
+  "POLICY_ENGINE",
+  "ENROLLED_CONTACT",
+  "NO_RESPONSE",
+  "SYSTEM_EXPIRY",
+]);
+
 const checkRowSchema = z
   .object({
     id: z.string().uuid(),
@@ -62,11 +69,13 @@ const checkRowSchema = z
     sanitized_summary: z.string().max(500),
     evidence_json: z.unknown(),
     policy_reasons: z.unknown(),
+    requested_action: z.string().nullable().optional(),
+    status_source: statusSource.optional(),
     created_at: isoTimestamp,
     updated_at: isoTimestamp,
     expires_at: nullableTimestamp,
   })
-  .strict();
+  .passthrough();
 
 function statusSourceFor(state: CheckState): StatusSource {
   if (state === "PENDING") return "NO_RESPONSE";
@@ -88,11 +97,11 @@ export function mapCheckRow(row: unknown): CheckRecord {
     sanitizedSummary: parsed.sanitized_summary,
     extraction,
     policyReasons: reasons,
-    requestedAction: extraction.requestedAction,
+    requestedAction: parsed.requested_action ?? extraction.requestedAction,
     createdAt: parsed.created_at,
     updatedAt: parsed.updated_at,
     expiresAt: parsed.expires_at,
-    statusSource: statusSourceFor(parsed.state),
+    statusSource: parsed.status_source ?? statusSourceFor(parsed.state),
   };
 }
 

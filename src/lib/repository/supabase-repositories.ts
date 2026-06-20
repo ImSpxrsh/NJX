@@ -1,8 +1,10 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import type { Database } from "@/types/database";
 import type {
   CircleCheckRepositories,
+  ExpiryResult,
   PendingVerificationCreator,
 } from "./contracts";
 import {
@@ -13,6 +15,7 @@ import {
   SupabasePendingVerificationCreator,
   SupabasePendingVerificationDataSource,
 } from "./supabase-pending-verification";
+import { mapHouseholdRow } from "./database-mappers";
 
 function unsupported(name: string): never {
   throw new Error(`${name} is not configured for Supabase mode.`);
@@ -127,13 +130,32 @@ export function createSupabaseRepositories(
       },
     },
     expiry: {
-      async expirePendingChecks() {
-        return unsupported("Expiry repository");
+      async expirePendingChecks(): Promise<ExpiryResult> {
+        const { data, error } = await client.rpc("expire_pending_checks");
+        if (error) throw new Error(`[supabase] expiry failed: ${error.message}`);
+        const rpcResultSchema = z
+          .array(
+            z.object({
+              expired_checks: z.number().int().nonnegative(),
+              expired_requests: z.number().int().nonnegative(),
+            }),
+          )
+          .min(1);
+        const parsed = rpcResultSchema.parse(data);
+        return {
+          expiredChecks: parsed[0].expired_checks,
+          expiredRequests: parsed[0].expired_requests,
+        };
       },
     },
     households: {
-      async getInternalById() {
-        return unsupported("Household repository");
+      async getInternalById(id) {
+        const { data } = await client
+          .from("households")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        return data ? mapHouseholdRow(data) : null;
       },
     },
   };
