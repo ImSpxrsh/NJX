@@ -2,6 +2,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type {
   CheckRecord,
+  HouseholdRecord,
+  PhoneAlertRecord,
+  PublicCheckRecord,
+  TrustedContactRecord,
   VerificationRequestRecord,
   VerificationResponse,
 } from "@/types/domain";
@@ -12,11 +16,13 @@ import {
   isValidTokenFormat,
 } from "@/lib/security/tokens";
 import { sha256 } from "@/lib/security/hashing";
+import type { CircleCheckRepositories, VerificationContext } from "./contracts";
 
 type Store = {
   checks: Map<string, CheckRecord>;
   requests: Map<string, VerificationRequestRecord>;
   phoneCallIds: Set<string>;
+  phoneAlerts: Map<string, PhoneAlertRecord>;
 };
 
 const globalStore = globalThis as typeof globalThis & {
@@ -29,6 +35,7 @@ const store =
     checks: new Map(),
     requests: new Map(),
     phoneCallIds: new Set(),
+    phoneAlerts: new Map(),
   });
 
 const householdId =
@@ -108,7 +115,37 @@ export function getCheck(id: string): CheckRecord | null {
   return structuredClone(check);
 }
 
-export function getVerificationContext(rawToken: string) {
+function toPublicCheck(check: CheckRecord): PublicCheckRecord {
+  const signals = Object.fromEntries(
+    Object.entries(check.extraction.signals).map(([name, signal]) => [
+      name,
+      {
+        name: signal.name,
+        score: signal.score,
+        present: signal.present,
+        explanation: signal.explanation,
+      },
+    ]),
+  ) as PublicCheckRecord["signals"];
+  return {
+    id: check.id,
+    source: check.source,
+    state: check.state,
+    verificationLevel: check.verificationLevel,
+    sanitizedSummary: check.sanitizedSummary,
+    policyReasons: check.policyReasons,
+    requestedAction: check.requestedAction,
+    createdAt: check.createdAt,
+    updatedAt: check.updatedAt,
+    expiresAt: check.expiresAt,
+    statusSource: check.statusSource,
+    signals,
+  };
+}
+
+export function getVerificationContext(
+  rawToken: string,
+): VerificationContext | null {
   if (!isValidTokenFormat(rawToken)) return null;
   const tokenHash = sha256(rawToken);
   const request = [...store.requests.values()].find(
@@ -200,4 +237,87 @@ export function resetDemo() {
   store.checks.clear();
   store.requests.clear();
   store.phoneCallIds.clear();
+  store.phoneAlerts.clear();
+}
+
+const demoHousehold: HouseholdRecord = {
+  id: householdId,
+  displayName: "CircleCheck Demo Household",
+  createdAt: new Date(0).toISOString(),
+};
+
+const demoContact: TrustedContactRecord = {
+  id: contactId,
+  householdId,
+  displayName: "Demo Trusted Contact",
+  phoneE164: null,
+  email: "trusted-contact@example.test",
+  channel: "manual_demo",
+  destinationVerifiedAt: new Date(0).toISOString(),
+  createdAt: new Date(0).toISOString(),
+};
+
+export function createDemoRepositories(): CircleCheckRepositories {
+  return {
+    checks: {
+      async create(input) {
+        if (input.householdId !== householdId) {
+          throw new Error("Demo household unavailable.");
+        }
+        const result = createCheck({
+          extraction: input.extraction,
+          decision: input.decision,
+          source: input.source,
+        });
+        return {
+          check: toPublicCheck(result.check),
+          verification: result.verification,
+        };
+      },
+      async getPublicById(id) {
+        const check = getCheck(id);
+        return check ? toPublicCheck(check) : null;
+      },
+      async getInternalById(id) {
+        return getCheck(id);
+      },
+    },
+    trustedContacts: {
+      async getInternalById(id) {
+        return id === demoContact.id ? structuredClone(demoContact) : null;
+      },
+      async getVerifiedForHousehold(id) {
+        return id === householdId ? structuredClone(demoContact) : null;
+      },
+    },
+    verificationRequests: {
+      async getContext(rawToken) {
+        return getVerificationContext(rawToken);
+      },
+      async respond(rawToken, response) {
+        return respondToVerification(rawToken, response);
+      },
+      async getInternalById(id) {
+        const request = store.requests.get(id);
+        return request ? structuredClone(request) : null;
+      },
+    },
+    phoneAlerts: {
+      async registerCall(callSid) {
+        return registerPhoneCall(callSid);
+      },
+      async getInternalByCallHash(callSidHash) {
+        const alert = store.phoneAlerts.get(callSidHash);
+        return alert ? structuredClone(alert) : null;
+      },
+    },
+    households: {
+      async getInternalById(id) {
+        return id === householdId ? structuredClone(demoHousehold) : null;
+      },
+    },
+    async resetDemo() {
+      resetDemo();
+    },
+  };
 }

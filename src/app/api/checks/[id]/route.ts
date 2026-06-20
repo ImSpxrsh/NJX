@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCheck } from "@/lib/repository/demo-store";
+import { getRepositories } from "@/lib/repository/factory";
 import type { CheckStatusResponse } from "@/types/api";
 
 export async function GET(
@@ -7,7 +7,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const check = getCheck(id);
+  const check = await getRepositories().checks.getPublicById(id);
   if (!check) {
     return NextResponse.json({ error: "Check not found." }, { status: 404 });
   }
@@ -30,7 +30,7 @@ export async function GET(
               : "A trusted-contact response was not required.",
     expiresAt: check.expiresAt,
     statusSource: check.statusSource,
-    signals: check.extraction.signals,
+    signals: check.signals,
   };
   return NextResponse.json(response, {
     headers: { "Cache-Control": "no-store" },

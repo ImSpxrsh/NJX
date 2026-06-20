@@ -4,7 +4,7 @@ import { validateTwilioRequest } from "@/lib/security/twilio-signature";
 import { parseTwilioParams } from "@/lib/security/twilio-request";
 import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
-import { createCheck, registerPhoneCall } from "@/lib/repository/demo-store";
+import { getRepositories } from "@/lib/repository/factory";
 
 export async function POST(request: Request) {
   const params = await parseTwilioParams(request);
@@ -27,12 +27,15 @@ export async function POST(request: Request) {
     });
   }
   const callSid = params.CallSid ?? "missing-call-id";
-  if (registerPhoneCall(callSid)) {
+  const repositories = getRepositories();
+  if (await repositories.phoneAlerts.registerCall(callSid)) {
     const extraction = await new FixtureEvidenceExtractor().extract({
       text: "Urgent phone alert involving money, gift cards, a password, or a verification code.",
       requestId: crypto.randomUUID(),
     });
-    createCheck({
+    await repositories.checks.create({
+      householdId:
+        process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001",
       extraction,
       decision: {
         ...evaluatePolicy(extraction),

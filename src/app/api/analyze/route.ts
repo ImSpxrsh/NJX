@@ -3,7 +3,7 @@ import { z } from "zod";
 import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { LlmEvidenceExtractor } from "@/lib/evidence/llm-extractor";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
-import { createCheck } from "@/lib/repository/demo-store";
+import { getRepositories } from "@/lib/repository/factory";
 import type { AnalyzeResponse } from "@/types/api";
 
 const inputSchema = z
@@ -32,7 +32,13 @@ export async function POST(request: Request) {
     requestId,
   });
   const decision = evaluatePolicy(extraction);
-  const { check, verification } = createCheck({ extraction, decision });
+  const repositories = getRepositories();
+  const { check, verification } = await repositories.checks.create({
+    householdId: parsed.data.householdId,
+    source: "web",
+    extraction,
+    decision,
+  });
   const appUrl = process.env.PUBLIC_APP_URL ?? new URL(request.url).origin;
   const response: AnalyzeResponse = {
     checkId: check.id,

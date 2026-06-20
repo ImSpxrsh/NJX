@@ -2,6 +2,8 @@ import type {
   CheckState,
   EvidenceExtraction,
   PolicyDecision,
+  PublicEvidenceSignal,
+  SignalName,
   StatusSource,
   VerificationLevel,
 } from "./domain";
@@ -28,5 +30,5 @@ export type CheckStatusResponse = {
   contactResponseStatus: string;
   expiresAt: string | null;
   statusSource: StatusSource;
-  signals: EvidenceExtraction["signals"];
+  signals: Record<SignalName, PublicEvidenceSignal>;
 };

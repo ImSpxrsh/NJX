@@ -26,3 +26,23 @@ state. The service-role client imports `server-only`.
 The demo link appears in the browser only as an explicitly labeled hackathon
 delivery channel. Production must deliver it directly to the enrolled
 destination.
+
+## Repository mode
+
+All API handlers depend on the interfaces in
+`src/lib/repository/contracts.ts`. They do not import the process-local store or
+Supabase directly.
+
+`CIRCLECHECK_REPOSITORY_MODE` must be set explicitly:
+
+- `demo` selects the process-local implementation. It is non-durable and meant
+  only for local demonstrations and automated tests.
+- `supabase` selects the production implementation. If that implementation or
+  its required configuration is unavailable, startup/request handling fails
+  closed. Production never silently falls back to process-local memory.
+
+Repository reads are divided into public-safe and privileged methods. Public
+check reads omit household identifiers, evidence storage internals, contact
+destinations, verification token hashes, and raw evidence spans. Demo mode also
+rejects requests for household IDs other than its explicitly configured demo
+household.
