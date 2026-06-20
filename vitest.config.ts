@@ -11,5 +11,9 @@ export default defineConfig({
       ),
     },
   },
-  test: { environment: "node", coverage: { reporter: ["text", "html"] } },
+  test: {
+    environment: "node",
+    setupFiles: ["src/test/setup.ts"],
+    coverage: { reporter: ["text", "html"] },
+  },
 });
