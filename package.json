@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "eval:evidence": "vitest run src/evals/evidence-eval.test.ts",
+    "eval:run": "tsx --conditions=react-server evals/run.ts",
     "test:cc204": "vitest run src/lib/runtime-config.test.ts src/lib/api/analyze-request.test.ts src/lib/api/analyze-response.test.ts src/lib/demo/reset.test.ts src/components/accessibility/DemoModeBanner.test.tsx",
     "db:types": "npx supabase gen types typescript --local > src/types/database.ts",
     "test:db": "npx supabase test db",
@@ -40,6 +41,7 @@
     "jsdom": "^26.1.0",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.3.1",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.2",
     "vitest": "^4.1.9"
   }
