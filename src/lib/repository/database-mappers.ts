@@ -98,6 +98,17 @@ export function mapCheckRow(row: unknown): CheckRecord {
 
 export function mapPublicCheckRow(row: unknown): PublicCheckRecord {
   const check = mapCheckRow(row);
+  const signals = Object.fromEntries(
+    Object.entries(check.extraction.signals).map(([name, signal]) => [
+      name,
+      {
+        name: signal.name,
+        score: signal.score,
+        present: signal.present,
+        explanation: signal.explanation,
+      },
+    ]),
+  ) as PublicCheckRecord["signals"];
   return {
     id: check.id,
     source: check.source,
@@ -110,7 +121,7 @@ export function mapPublicCheckRow(row: unknown): PublicCheckRecord {
     updatedAt: check.updatedAt,
     expiresAt: check.expiresAt,
     statusSource: check.statusSource,
-    signals: check.extraction.signals,
+    signals,
   };
 }
 

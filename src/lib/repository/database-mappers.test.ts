@@ -63,6 +63,7 @@ describe("database mappers", () => {
     expect(JSON.stringify(publicCheck)).not.toContain("token_hash");
     expect(publicCheck).not.toHaveProperty("householdId");
     expect(publicCheck).not.toHaveProperty("extraction");
+    expect(JSON.stringify(publicCheck)).not.toContain("evidenceSpans");
   });
 
   it("preserves nullable expiry intentionally", async () => {
