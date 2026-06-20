@@ -40,7 +40,10 @@ export type CheckCreationResult = {
 
 export interface CheckRepository {
   create(input: CheckCreationInput): Promise<CheckCreationResult>;
-  getPublicById(id: string): Promise<PublicCheckRecord | null>;
+  getPublicById(
+    id: string,
+    scope?: { householdId: string },
+  ): Promise<PublicCheckRecord | null>;
   getInternalById(id: string): Promise<CheckRecord | null>;
 }
 

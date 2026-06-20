@@ -1,12 +1,16 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json, TableInsert } from "@/types/database";
+import type { Database, TableInsert } from "@/types/database";
 import type { CheckRepository, PendingVerificationCreator } from "./contracts";
-import { mapCheckRow, mapPublicCheckRow } from "./database-mappers";
+import {
+  mapCheckRow,
+  mapPublicCheckRow,
+  toPausedCheckInsert,
+} from "./database-mappers";
 
 export interface CheckDataSource {
   insertPaused(row: TableInsert<"checks">): Promise<unknown>;
-  findById(id: string): Promise<unknown | null>;
+  findById(id: string, householdId?: string): Promise<unknown | null>;
 }
 
 export class SupabaseCheckDataSource implements CheckDataSource {
@@ -22,19 +26,13 @@ export class SupabaseCheckDataSource implements CheckDataSource {
     return data;
   }
 
-  async findById(id: string): Promise<unknown | null> {
-    const { data, error } = await this.client
-      .from("checks")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
+  async findById(id: string, householdId?: string): Promise<unknown | null> {
+    let query = this.client.from("checks").select("*").eq("id", id);
+    if (householdId) query = query.eq("household_id", householdId);
+    const { data, error } = await query.maybeSingle();
     if (error) throw new Error("Unable to read check.");
     return data;
   }
-}
-
-function toJson(value: unknown): Json {
-  return JSON.parse(JSON.stringify(value)) as Json;
 }
 
 export class SupabaseCheckRepository implements CheckRepository {
@@ -45,16 +43,9 @@ export class SupabaseCheckRepository implements CheckRepository {
   ) {}
 
   async create(input: Parameters<CheckRepository["create"]>[0]) {
-    const inserted = await this.dataSource.insertPaused({
-      household_id: input.householdId,
-      source: input.source,
-      state: "PAUSED",
-      verification_level: input.decision.level,
-      sanitized_summary: input.extraction.plainLanguageSummary,
-      evidence_json: toJson(input.extraction),
-      policy_reasons: toJson(input.decision.reasons),
-      expires_at: null,
-    });
+    const inserted = await this.dataSource.insertPaused(
+      toPausedCheckInsert(input),
+    );
     const pausedCheck = mapPublicCheckRow(inserted);
 
     if (!input.decision.verificationRequired) {
@@ -83,8 +74,9 @@ export class SupabaseCheckRepository implements CheckRepository {
     return { check: pendingCheck, verification };
   }
 
-  async getPublicById(id: string) {
-    const row = await this.dataSource.findById(id);
+  async getPublicById(id: string, scope?: { householdId: string }) {
+    if (!scope) return null;
+    const row = await this.dataSource.findById(id, scope.householdId);
     return row ? mapPublicCheckRow(row) : null;
   }
 

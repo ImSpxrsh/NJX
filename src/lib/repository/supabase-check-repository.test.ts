@@ -28,7 +28,13 @@ class FakeCheckDataSource implements CheckDataSource {
     return structuredClone(this.row);
   }
 
-  async findById(id: string) {
+  async findById(id: string, requestedHouseholdId?: string) {
+    if (
+      requestedHouseholdId &&
+      requestedHouseholdId !== this.row?.household_id
+    ) {
+      return null;
+    }
     return id === checkId && this.row ? structuredClone(this.row) : null;
   }
 }
@@ -118,7 +124,9 @@ describe("SupabaseCheckRepository", () => {
     const dataSource = new FakeCheckDataSource();
     const repository = new SupabaseCheckRepository(dataSource);
     const created = await repository.create(await inputFor(fixtures.ordinary));
-    const publicCheck = await repository.getPublicById(created.check.id);
+    const publicCheck = await repository.getPublicById(created.check.id, {
+      householdId,
+    });
 
     expect(publicCheck).not.toHaveProperty("householdId");
     expect(publicCheck).not.toHaveProperty("extraction");
@@ -128,6 +136,28 @@ describe("SupabaseCheckRepository", () => {
 
   it("returns null for an unknown check", async () => {
     const repository = new SupabaseCheckRepository(new FakeCheckDataSource());
-    await expect(repository.getPublicById(checkId)).resolves.toBeNull();
+    await expect(
+      repository.getPublicById(checkId, { householdId }),
+    ).resolves.toBeNull();
+  });
+
+  it("fails closed without an authorization scope", async () => {
+    const dataSource = new FakeCheckDataSource();
+    const repository = new SupabaseCheckRepository(dataSource);
+    const created = await repository.create(await inputFor(fixtures.ordinary));
+    await expect(
+      repository.getPublicById(created.check.id),
+    ).resolves.toBeNull();
+  });
+
+  it("returns the same not-found result for a different household", async () => {
+    const dataSource = new FakeCheckDataSource();
+    const repository = new SupabaseCheckRepository(dataSource);
+    const created = await repository.create(await inputFor(fixtures.ordinary));
+    await expect(
+      repository.getPublicById(created.check.id, {
+        householdId: "00000000-0000-4000-8000-000000000099",
+      }),
+    ).resolves.toBeNull();
   });
 });

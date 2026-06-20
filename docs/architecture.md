@@ -54,5 +54,6 @@ the repository throws and the persisted check remains `PAUSED`; it never returns
 a partially created PENDING check.
 
 The prototype does not yet have production household authentication. Until that
-is implemented, unknown and inaccessible public check reads use the same
-not-found response and return no household or contact metadata.
+is implemented, Supabase public check reads fail closed unless trusted server
+code supplies a household scope. Missing, unknown, and mismatched scopes all
+produce the same not-found result and return no household or contact metadata.
