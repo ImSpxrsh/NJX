@@ -1,6 +1,8 @@
 # Demo runbook
 
-1. Run `npm install`, copy `.env.example` to `.env.local`, and run `npm run dev`.
+1. Run `npm install`, copy `.env.example` to `.env.local`, set
+   `CIRCLECHECK_RUNTIME_MODE=demo` and `CIRCLECHECK_REPOSITORY_MODE=demo`, then
+   run `npm run dev`.
 2. Open `http://localhost:3000/demo`.
 3. Select **Reset and create demo request**. This loads the gift-card fixture.
 4. Open the senior view and observe L3, the explicit hold, and pending status.

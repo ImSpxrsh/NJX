@@ -47,6 +47,40 @@ destinations, verification token hashes, and raw evidence spans. Demo mode also
 rejects requests for household IDs other than its explicitly configured demo
 household.
 
+The Supabase check repository always inserts a check as `PAUSED`. Low-concern
+checks remain paused. L2/L3 checks can become `PENDING` only through an injected
+transactional verification creator. If that operation is unavailable or fails,
+the repository throws and the persisted check remains `PAUSED`; it never returns
+a partially created PENDING check.
+
+`create_pending_verification` is the production transition boundary. It locks
+the PAUSED check row, verifies the contact belongs to the same household and has
+a verified destination, locks that contact row against concurrent reassignment,
+rejects an existing active request, inserts only the token hash, and transitions
+the check to PENDING in one database transaction. Contact selection is stable by
+enrollment time and ID. The function is executable only by the service role;
+database policy tests assert both the service-role grant and anonymous denial.
+
+## Runtime and demo boundary
+
+`src/lib/runtime-config.ts` is the sole server-side runtime-mode resolver. Demo
+mode requires the exact value `CIRCLECHECK_RUNTIME_MODE=demo` and the demo
+repository. Missing, false-like, mixed-case, whitespace-padded, or invalid
+values do not enable it. A production-built deployment additionally requires
+`CIRCLECHECK_DEMO_DEPLOYMENT=true`; otherwise contradictory production/demo
+configuration throws.
+
+Production `/api/analyze` uses a strict schema that cannot contain a demo URL,
+raw token, token hash, or verification credential. Explicit demo mode uses a
+different strict schema. `/api/demo/reset` checks runtime and same-origin
+authorization before constructing a repository or mutating data. The root
+server layout renders the persistent accessible demo warning; query parameters,
+headers, cookies, and browser storage do not participate in runtime resolution.
+
+The prototype does not yet have production household authentication. Until that
+is implemented, Supabase public check reads fail closed unless trusted server
+code supplies a household scope. Missing, unknown, and mismatched scopes all
+produce the same not-found result and return no household or contact metadata.
 ## Enrollment destination verification
 
 Destination verification (CC-202) is a separate subsystem from request

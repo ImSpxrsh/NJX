@@ -9,6 +9,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:cc204": "vitest run src/lib/runtime-config.test.ts src/lib/api/analyze-request.test.ts src/lib/api/analyze-response.test.ts src/lib/demo/reset.test.ts src/components/accessibility/DemoModeBanner.test.tsx",
+    "db:types": "npx supabase gen types typescript --local > src/types/database.ts",
+    "test:db": "npx supabase test db",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

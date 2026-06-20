@@ -7,8 +7,11 @@ messages, contact destinations, or service credentials.
 
 Input: `{ householdId: uuid, message: string, mode?: "fixture"|"llm" }`.
 Returns the check ID, PAUSED/PENDING state, validated extraction, deterministic
-decision, and optional request metadata. In demo mode only, it also returns a
-clearly labeled contact URL to simulate delivery.
+decision, and optional non-secret request metadata.
+
+Production uses a strict response schema that has no demo URL or raw-token
+field. Explicit demo runtime uses a separate strict schema and may include
+`verification.demoContactUrl` to simulate delivery.
 
 ## `GET /api/checks/:id`
 
@@ -85,5 +88,6 @@ Never includes the destination value or any secret. Unknown ids receive a 404.
 
 ## `POST /api/demo/reset`
 
-Clears process-local demo state. This route must be disabled or authenticated
-before a public production deployment.
+Clears process-local demo state only in explicit demo runtime after a
+same-origin check. It returns 404 before repository access in production,
+development, and test runtime by default.

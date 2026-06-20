@@ -25,6 +25,16 @@ export type CreatedVerification = {
   rawToken?: string;
 };
 
+export type PendingVerificationCreationInput = {
+  checkId: string;
+  householdId: string;
+  expiresAt: string;
+};
+
+export interface PendingVerificationCreator {
+  create(input: PendingVerificationCreationInput): Promise<CreatedVerification>;
+}
+
 export type CheckCreationResult = {
   check: PublicCheckRecord;
   verification?: CreatedVerification;
@@ -32,7 +42,10 @@ export type CheckCreationResult = {
 
 export interface CheckRepository {
   create(input: CheckCreationInput): Promise<CheckCreationResult>;
-  getPublicById(id: string): Promise<PublicCheckRecord | null>;
+  getPublicById(
+    id: string,
+    scope?: { householdId: string },
+  ): Promise<PublicCheckRecord | null>;
   getInternalById(id: string): Promise<CheckRecord | null>;
 }
 

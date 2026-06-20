@@ -330,7 +330,8 @@ export function createDemoRepositories(): CircleCheckRepositories {
           verification: result.verification,
         };
       },
-      async getPublicById(id) {
+      async getPublicById(id, scope) {
+        if (scope && scope.householdId !== householdId) return null;
         const check = getCheck(id);
         return check ? toPublicCheck(check) : null;
       },
