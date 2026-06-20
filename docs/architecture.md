@@ -46,3 +46,15 @@ check reads omit household identifiers, evidence storage internals, contact
 destinations, verification token hashes, and raw evidence spans. Demo mode also
 rejects requests for household IDs other than its explicitly configured demo
 household.
+
+## Enrollment destination verification
+
+Destination verification (CC-202) is a separate subsystem from request
+verification with its own table (`enrollment_verifications`), its own
+purpose-bound token hashing, its own repository (`enrollmentVerifications`), and
+its own API namespace (`/api/enrollment/*`). A request-verification token can
+never satisfy an enrollment check and vice versa. A destination becomes verified
+only by single-use consumption of a short-lived, hashed secret inside the trusted
+server boundary; any failure leaves it unverified. See
+`docs/enrollment-verification.md` for the token lifecycle, data handling, and
+demo-mode rules.
