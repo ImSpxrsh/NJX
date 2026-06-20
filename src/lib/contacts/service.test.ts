@@ -4,6 +4,7 @@ import {
   getRepositories,
   resetRepositoryFactoryForTests,
 } from "@/lib/repository/factory";
+import { resetRuntimeConfigForTests } from "@/lib/runtime-config";
 import { ContactError } from "./errors";
 import {
   assertHighTrustEligible,
@@ -20,10 +21,12 @@ const HOUSEHOLD = "00000000-0000-4000-8000-000000000001";
 const OTHER_HOUSEHOLD = "00000000-0000-4000-8000-0000000000ff";
 
 beforeAll(() => {
+  process.env.CIRCLECHECK_RUNTIME_MODE = "demo";
   process.env.CIRCLECHECK_REPOSITORY_MODE = "demo";
 });
 
 beforeEach(() => {
+  resetRuntimeConfigForTests();
   resetRepositoryFactoryForTests();
   resetDemo();
 });

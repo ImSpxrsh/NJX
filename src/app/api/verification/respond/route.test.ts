@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetRateLimitsForTests } from "@/lib/security/rate-limit";
 import { POST } from "./route";
 
 const respond = vi.fn();
@@ -12,6 +13,7 @@ vi.mock("@/lib/repository/factory", () => ({
 function request(body: unknown): Request {
   return new Request("https://example.test/api/verification/respond", {
     method: "POST",
+    headers: { "x-forwarded-for": "203.0.113.10" },
     body: JSON.stringify(body),
   });
 }
@@ -23,6 +25,11 @@ describe("POST /api/verification/respond", () => {
     code: "REJECTED",
     message: "Verification response was not accepted.",
   };
+
+  beforeEach(() => {
+    resetRateLimitsForTests();
+    respond.mockReset();
+  });
 
   it("returns a generic rejection for malformed input", async () => {
     const response = await POST(
@@ -46,5 +53,18 @@ describe("POST /api/verification/respond", () => {
     expect(used.status).toBe(409);
     expect(await unknown.json()).toEqual(rejected);
     expect(await used.json()).toEqual(rejected);
+  });
+
+  it("rate limits with the same generic rejection shape", async () => {
+    respond.mockResolvedValue({ ok: false, code: "UNKNOWN_TOKEN" });
+
+    for (let i = 0; i < 20; i += 1) {
+      await POST(request({ token, response: "DENIED_MINE" }));
+    }
+    const response = await POST(request({ token, response: "DENIED_MINE" }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBeTruthy();
+    expect(await response.json()).toEqual(rejected);
   });
 });

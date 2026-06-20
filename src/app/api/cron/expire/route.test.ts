@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetRateLimitsForTests } from "@/lib/security/rate-limit";
 import { POST } from "./route";
 
 const expirePendingChecks = vi.fn();
@@ -23,11 +24,13 @@ describe("POST /api/cron/expire", () => {
       expiredChecks: 2,
       expiredRequests: 3,
     });
+    resetRateLimitsForTests();
   });
 
   afterEach(() => {
     delete process.env.CRON_SECRET;
     expirePendingChecks.mockReset();
+    resetRateLimitsForTests();
   });
 
   it("rejects requests without the cron secret", async () => {
@@ -57,5 +60,17 @@ describe("POST /api/cron/expire", () => {
       expiredChecks: 2,
       expiredRequests: 3,
     });
+  });
+
+  it("rate limits repeated unauthorized expiry attempts", async () => {
+    for (let i = 0; i < 10; i += 1) {
+      await POST(request());
+    }
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ ok: false });
+    expect(expirePendingChecks).not.toHaveBeenCalled();
   });
 });

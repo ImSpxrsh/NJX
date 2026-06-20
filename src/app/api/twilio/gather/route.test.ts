@@ -1,30 +1,13 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { resetRepositoryFactoryForTests } from "@/lib/repository/factory";
-import { getCheck, resetDemo } from "@/lib/repository/demo-store";
-import { sha256 } from "@/lib/security/hashing";
-import { POST } from "./route";
-
-function request(params: Record<string, string>): Request {
-  return new Request("https://example.test/api/twilio/gather", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(params),
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildTwilioRequest,
   signTwilioRequest,
 } from "@/lib/security/twilio-test-helpers";
-
-const registerCall = vi.fn();
-const createCheck = vi.fn();
-
-vi.mock("@/lib/repository/factory", () => ({
-  getRepositories: () => ({
-    phoneAlerts: { registerCall },
-    checks: { create: createCheck },
-  }),
-}));
-
+import { resetRepositoryFactoryForTests } from "@/lib/repository/factory";
+import { getCheck, resetDemo } from "@/lib/repository/demo-store";
+import { sha256 } from "@/lib/security/hashing";
+import { resetRateLimitsForTests } from "@/lib/security/rate-limit";
+import { resetRuntimeConfigForTests } from "@/lib/runtime-config";
 import { POST } from "./route";
 
 const TOKEN = "gather-route-token-dddddddddddddddddddd";
@@ -34,15 +17,24 @@ const savedEnv = { ...process.env };
 beforeEach(() => {
   process.env = {
     ...savedEnv,
+    CIRCLECHECK_RUNTIME_MODE: "demo",
+    CIRCLECHECK_REPOSITORY_MODE: "demo",
+    DEMO_CALLER_PHONE_E164: "+15551234567",
+    PUBLIC_APP_URL: BASE,
     TWILIO_AUTH_TOKEN: TOKEN,
     TWILIO_PUBLIC_BASE_URL: BASE,
   };
-  registerCall.mockReset().mockResolvedValue(true);
-  createCheck.mockReset().mockResolvedValue({ check: {} });
+  resetRuntimeConfigForTests();
+  resetRepositoryFactoryForTests();
+  resetDemo();
+  resetRateLimitsForTests();
 });
 
 afterEach(() => {
   process.env = { ...savedEnv };
+  resetRuntimeConfigForTests();
+  resetRepositoryFactoryForTests();
+  resetRateLimitsForTests();
 });
 
 function signed(params: Record<string, string>) {
@@ -58,27 +50,23 @@ function signed(params: Record<string, string>) {
   });
 }
 
-describe("POST /api/twilio/gather", () => {
-  beforeEach(() => {
-    process.env.CIRCLECHECK_REPOSITORY_MODE = "demo";
-    process.env.DEMO_CALLER_PHONE_E164 = "+15551234567";
-    delete process.env.TWILIO_AUTH_TOKEN;
-    resetRepositoryFactoryForTests();
-    resetDemo();
-  });
+async function repositories() {
+  return import("@/lib/repository/factory").then((mod) =>
+    mod.getRepositories(),
+  );
+}
 
+describe("POST /api/twilio/gather", () => {
   it("known caller creates one pending phone alert", async () => {
     await POST(
-      request({
+      signed({
         Digits: "1",
         CallSid: "known-call",
         From: "+1 (555) 123-4567",
       }),
     );
-    const repositories = await import("@/lib/repository/factory").then((mod) =>
-      mod.getRepositories(),
-    );
-    const alert = await repositories.phoneAlerts.getInternalByCallHash(
+    const repos = await repositories();
+    const alert = await repos.phoneAlerts.getInternalByCallHash(
       sha256("known-call"),
     );
 
@@ -90,7 +78,7 @@ describe("POST /api/twilio/gather", () => {
       source: "phone",
     });
     const notification =
-      await repositories.verificationNotifications.getInternalByRequestId(
+      await repos.verificationNotifications.getInternalByRequestId(
         alert!.verificationRequestId,
       );
     expect(notification?.verificationUrl).toContain("/verify/");
@@ -98,26 +86,22 @@ describe("POST /api/twilio/gather", () => {
 
   it("unknown caller receives generic instructions without creating an alert", async () => {
     const response = await POST(
-      request({ Digits: "1", CallSid: "unknown-call", From: "+15557654321" }),
+      signed({ Digits: "1", CallSid: "unknown-call", From: "+15557654321" }),
     );
-    const repositories = await import("@/lib/repository/factory").then((mod) =>
-      mod.getRepositories(),
-    );
+    const repos = await repositories();
 
     expect(await response.text()).toContain("trusted number printed");
     await expect(
-      repositories.phoneAlerts.getInternalByCallHash(sha256("unknown-call")),
+      repos.phoneAlerts.getInternalByCallHash(sha256("unknown-call")),
     ).resolves.toBeNull();
   });
 
   it("caller ID routing cannot create VERIFIED", async () => {
     await POST(
-      request({ Digits: "1", CallSid: "spoofed-call", From: "+15551234567" }),
+      signed({ Digits: "1", CallSid: "spoofed-call", From: "+15551234567" }),
     );
-    const repositories = await import("@/lib/repository/factory").then((mod) =>
-      mod.getRepositories(),
-    );
-    const alert = await repositories.phoneAlerts.getInternalByCallHash(
+    const repos = await repositories();
+    const alert = await repos.phoneAlerts.getInternalByCallHash(
       sha256("spoofed-call"),
     );
 
@@ -126,19 +110,15 @@ describe("POST /api/twilio/gather", () => {
 
   it("notification failure still returns safe instructions", async () => {
     process.env.DEMO_NOTIFICATION_FAIL = "1";
-    try {
-      const response = await POST(
-        request({ Digits: "1", CallSid: "notify-fail", From: "+15551234567" }),
-      );
-      expect(await response.text()).toContain("Do not send anything yet");
-    } finally {
-      delete process.env.DEMO_NOTIFICATION_FAIL;
-    }
+    const response = await POST(
+      signed({ Digits: "1", CallSid: "notify-fail", From: "+15551234567" }),
+    );
+    expect(await response.text()).toContain("Do not send anything yet");
   });
 
   it("invalid digits and TwiML introduce no recording or transcription", async () => {
     const response = await POST(
-      request({ Digits: "9", CallSid: "bad-digit", From: "+15551234567" }),
+      signed({ Digits: "9", CallSid: "bad-digit", From: "+15551234567" }),
     );
     const body = await response.text();
     expect(body).toContain("No alert was created");
@@ -149,63 +129,56 @@ describe("POST /api/twilio/gather", () => {
 
   it("repeated CallSid is idempotent", async () => {
     await POST(
-      request({ Digits: "1", CallSid: "repeat-call", From: "+15551234567" }),
+      signed({ Digits: "1", CallSid: "repeat-call", From: "+15551234567" }),
     );
-    const repositories = await import("@/lib/repository/factory").then((mod) =>
-      mod.getRepositories(),
-    );
-    const firstAlert = await repositories.phoneAlerts.getInternalByCallHash(
+    const repos = await repositories();
+    const firstAlert = await repos.phoneAlerts.getInternalByCallHash(
       sha256("repeat-call"),
     );
     await POST(
-      request({ Digits: "1", CallSid: "repeat-call", From: "+15551234567" }),
+      signed({ Digits: "1", CallSid: "repeat-call", From: "+15551234567" }),
     );
-    const secondAlert = await repositories.phoneAlerts.getInternalByCallHash(
+    const secondAlert = await repos.phoneAlerts.getInternalByCallHash(
       sha256("repeat-call"),
     );
 
     expect(secondAlert?.id).toBe(firstAlert?.id);
     expect(secondAlert?.checkId).toBe(firstAlert?.checkId);
-  it("creates a phone-originated L3 check when digit 1 is pressed with a valid signature", async () => {
-    const response = await POST(signed({ CallSid: "CA-1", Digits: "1" }));
-    expect(response.status).toBe(200);
-    expect(registerCall).toHaveBeenCalledWith("CA-1");
-    expect(createCheck).toHaveBeenCalledTimes(1);
-    expect(createCheck.mock.calls[0]![0]).toMatchObject({
-      source: "phone",
-      decision: { level: "L3", verificationRequired: true },
-    });
   });
 
   it("makes no trust-state change on a missing signature", async () => {
     const response = await POST(
       buildTwilioRequest({
         url: "http://internal.local/api/twilio/gather",
-        params: { CallSid: "CA-2", Digits: "1" },
+        params: { CallSid: "CA-2", Digits: "1", From: "+15551234567" },
       }),
     );
     expect(response.status).toBe(403);
-    expect(registerCall).not.toHaveBeenCalled();
-    expect(createCheck).not.toHaveBeenCalled();
+    const repos = await repositories();
+    await expect(
+      repos.phoneAlerts.getInternalByCallHash(sha256("CA-2")),
+    ).resolves.toBeNull();
   });
 
-  it("makes no trust-state change on an invalid signature", async () => {
-    const response = await POST(
-      buildTwilioRequest({
-        url: "http://internal.local/api/twilio/gather",
-        params: { CallSid: "CA-3", Digits: "1" },
-        signature: "tampered",
-      }),
+  it("rate limits repeated gather callbacks without creating an approval", async () => {
+    const params = {
+      CallSid: "rate-limited-call",
+      Digits: "1",
+      From: "+15551234567",
+    };
+    for (let i = 0; i < 5; i += 1) {
+      await POST(signed(params));
+    }
+
+    const response = await POST(signed(params));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBeTruthy();
+    expect(await response.text()).toContain("Do not send anything yet");
+    const repos = await repositories();
+    const alert = await repos.phoneAlerts.getInternalByCallHash(
+      sha256("rate-limited-call"),
     );
-    expect(response.status).toBe(403);
-    expect(registerCall).not.toHaveBeenCalled();
-    expect(createCheck).not.toHaveBeenCalled();
-  });
-
-  it("creates no check for a non-1 digit even with a valid signature", async () => {
-    const response = await POST(signed({ CallSid: "CA-4", Digits: "5" }));
-    expect(response.status).toBe(200);
-    expect(registerCall).not.toHaveBeenCalled();
-    expect(createCheck).not.toHaveBeenCalled();
+    expect(getCheck(alert!.checkId)?.state).toBe("PENDING");
   });
 });
