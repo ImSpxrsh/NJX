@@ -66,17 +66,26 @@ create table public.phone_alerts (
   created_at timestamptz not null default now()
 );
 
+create table public.phone_caller_mappings (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households(id) on delete cascade,
+  caller_phone_hash text not null unique check (char_length(caller_phone_hash) = 64),
+  created_at timestamptz not null default now()
+);
+
 create index checks_state_idx on public.checks(state);
 create index checks_expiry_idx on public.checks(expires_at);
 create index trusted_contacts_household_idx on public.trusted_contacts(household_id);
 create index verification_requests_hash_idx on public.verification_requests(token_hash);
 create index verification_requests_expiry_idx on public.verification_requests(expires_at);
+create index phone_caller_mappings_household_idx on public.phone_caller_mappings(household_id);
 
 alter table public.households enable row level security;
 alter table public.trusted_contacts enable row level security;
 alter table public.checks enable row level security;
 alter table public.verification_requests enable row level security;
 alter table public.phone_alerts enable row level security;
+alter table public.phone_caller_mappings enable row level security;
 
 create or replace function public.consume_verification_token(
   supplied_token text,

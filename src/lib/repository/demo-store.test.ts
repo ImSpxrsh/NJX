@@ -7,6 +7,7 @@ import {
   createCheck,
   getCheck,
   resetDemo,
+  resolveHouseholdForCaller,
   respondToVerification,
   expirePendingChecks,
 } from "./demo-store";
@@ -200,5 +201,22 @@ describe("trusted-contact loop", () => {
     expect(JSON.stringify(created.check)).not.toContain("evidenceSpans");
     expect(created.check).not.toHaveProperty("householdId");
     expect(created.check).not.toHaveProperty("extraction");
+  });
+
+  it("normalizes caller metadata only for household routing", async () => {
+    const previousCaller = process.env.DEMO_CALLER_PHONE_E164;
+    process.env.DEMO_CALLER_PHONE_E164 = "+15551234567";
+    try {
+      expect(resolveHouseholdForCaller("+1 (555) 123-4567")).toMatchObject({
+        householdId: "00000000-0000-4000-8000-000000000001",
+      });
+      expect(resolveHouseholdForCaller("+15557654321")).toBeNull();
+    } finally {
+      if (previousCaller === undefined) {
+        delete process.env.DEMO_CALLER_PHONE_E164;
+      } else {
+        process.env.DEMO_CALLER_PHONE_E164 = previousCaller;
+      }
+    }
   });
 });

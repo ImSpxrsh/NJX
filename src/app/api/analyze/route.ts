@@ -35,6 +35,31 @@ export async function POST(request: Request) {
     extraction,
     decision,
   });
+  const appUrl = process.env.PUBLIC_APP_URL ?? new URL(request.url).origin;
+  if (verification?.rawToken) {
+    await repositories.verificationNotifications
+      .sendVerificationLink({
+        requestId: verification.requestId,
+        rawToken: verification.rawToken,
+        appUrl,
+      })
+      .catch(() => null);
+  }
+  const response: AnalyzeResponse = {
+    checkId: check.id,
+    state: check.state as "PAUSED" | "PENDING",
+    extraction,
+    decision,
+    ...(verification
+      ? {
+          verification: {
+            requestId: verification.requestId,
+            expiresAt: verification.expiresAt,
+            demoContactUrl: `${appUrl}/verify/${verification.rawToken}`,
+          },
+        }
+      : {}),
+  };
   const response: AnalyzeResponse = serializeAnalyzeResponse(
     getRuntimeConfig(),
     {

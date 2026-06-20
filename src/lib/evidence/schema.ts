@@ -22,6 +22,17 @@ const signalSchema = (name: SignalName) =>
     })
     .strict();
 
+const metadataSchema = z
+  .object({
+    promptVersion: z.string().trim().max(80),
+    deterministicRuleVersion: z.string().trim().max(80),
+    provider: z.string().trim().max(80),
+    model: z.string().trim().max(120).nullable(),
+    fallbackUsed: z.boolean(),
+    ruleIds: z.array(z.string().trim().max(80)).max(30).optional(),
+  })
+  .strict();
+
 export const evidenceExtractionSchema = z
   .object({
     schemaVersion: z.literal("1.0"),
@@ -38,6 +49,7 @@ export const evidenceExtractionSchema = z
       .strict(),
     uncertainty: z.boolean(),
     plainLanguageSummary: boundedText,
+    metadata: metadataSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {

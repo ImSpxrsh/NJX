@@ -7,6 +7,7 @@ import type {
   EvidenceExtraction,
   HouseholdRecord,
   PhoneAlertRecord,
+  PhoneCallerRoute,
   PolicyDecision,
   PublicCheckRecord,
   TrustedContactRecord,
@@ -141,10 +142,33 @@ export interface VerificationRequestRepository {
 }
 
 export interface PhoneAlertRepository {
+  resolveHouseholdForCaller(
+    caller: string | null | undefined,
+  ): Promise<PhoneCallerRoute | null>;
   registerCall(callSid: string): Promise<boolean>;
+  recordAlert(input: {
+    callSid: string;
+    householdId: string;
+    checkId: string;
+    verificationRequestId: string;
+    pressedDigit: "1";
+  }): Promise<PhoneAlertRecord>;
   getInternalByCallHash(callSidHash: string): Promise<PhoneAlertRecord | null>;
 }
 
+export type VerificationNotification = {
+  requestId: string;
+  verificationUrl: string;
+  deliveredAt: string;
+};
+
+export interface VerificationNotificationRepository {
+  sendVerificationLink(input: {
+    requestId: string;
+    rawToken: string;
+    appUrl: string;
+  }): Promise<VerificationNotification>;
+  getInternalByRequestId(requestId: string): Promise<VerificationNotification | null>;
 export type ExpiryResult = {
   expiredChecks: number;
   expiredRequests: number;
@@ -271,6 +295,7 @@ export interface CircleCheckRepositories {
   verificationRequests: VerificationRequestRepository;
   enrollmentVerifications: EnrollmentVerificationRepository;
   phoneAlerts: PhoneAlertRepository;
+  verificationNotifications: VerificationNotificationRepository;
   expiry: ExpiryRepository;
   households: HouseholdRepository;
   resetDemo?: () => Promise<void>;
