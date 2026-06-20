@@ -44,3 +44,10 @@ Review generated changes together with the migration. Domain code must continue
 to use runtime-validated mapper functions rather than trusting generated row
 types at API boundaries. Read mappers validate database rows, while write
 mappers construct restricted inserts such as PAUSED-only check creation.
+
+Database policy tests require a running local Supabase stack:
+
+```bash
+npx supabase start
+npm run test:db
+```
