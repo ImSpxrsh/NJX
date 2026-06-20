@@ -6,6 +6,40 @@ messages, contact destinations, or service credentials.
 ## `POST /api/analyze`
 
 Input: `{ householdId: uuid, message: string, mode?: "fixture"|"llm" }`.
+
+**Production response** — strict schema, no demo-only fields:
+```json
+{
+  "checkId": "<uuid>",
+  "state": "PAUSED | PENDING",
+  "extraction": { ... },
+  "decision": { ... },
+  "verification": {
+    "requestId": "<uuid>",
+    "expiresAt": "<iso8601>"
+  }
+}
+```
+`verification` is omitted when no contact confirmation is required.
+The production schema never includes `demoContactUrl`, raw tokens, token
+hashes, or verification URLs. The strict Zod schema will throw rather than
+silently include forbidden fields.
+
+**Demo response** — only returned when `CIRCLECHECK_REPOSITORY_MODE=demo`
+and `NODE_ENV` is not `production`:
+```json
+{
+  "checkId": "<uuid>",
+  "state": "PENDING",
+  "extraction": { ... },
+  "decision": { ... },
+  "verification": { "requestId": "<uuid>", "expiresAt": "<iso8601>" },
+  "demoContactUrl": "http://localhost:3000/verify/<token>"
+}
+```
+`demoContactUrl` is present only when verification is required.
+Client-supplied data (query params, headers, body fields, cookies) cannot
+activate demo mode or cause `demoContactUrl` to appear.
 Returns the check ID, PAUSED/PENDING state, validated extraction, deterministic
 decision, and optional non-secret request metadata.
 
@@ -148,6 +182,15 @@ Never includes the destination value or any secret. Unknown ids receive a 404.
 
 ## `POST /api/demo/reset`
 
+Clears process-local demo state.
+
+**Unavailable outside demo mode.** Returns `404 Not Found` when
+`CIRCLECHECK_REPOSITORY_MODE` is not `demo`, or when `NODE_ENV=production`
+regardless of repository mode. The 404 check occurs before any database
+access; no state is read or mutated on non-demo requests.
+
+In demo mode, resets only the in-memory demo store. The response body is
+`{ "ok": true }` with no tokens, verification URLs, or household identifiers.
 Clears process-local demo state only in explicit demo runtime after a
 same-origin check. It returns 404 before repository access in production,
 development, and test runtime by default.
