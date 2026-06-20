@@ -221,6 +221,18 @@ export type Database = {
     };
     Views: Record<never, never>;
     Functions: {
+      create_pending_verification: {
+        Args: {
+          target_check_id: string;
+          target_trusted_contact_id: string;
+          supplied_token_hash: string;
+          supplied_expires_at: string;
+        };
+        Returns: {
+          request_id: string;
+          expires_at: string;
+        }[];
+      };
       consume_verification_token: {
         Args: {
           supplied_token: string;

@@ -3,7 +3,11 @@ import { z } from "zod";
 import { FixtureEvidenceExtractor } from "@/lib/evidence/fixture-extractor";
 import { LlmEvidenceExtractor } from "@/lib/evidence/llm-extractor";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
-import { getRepositories } from "@/lib/repository/factory";
+import {
+  getRepositories,
+  resolveRepositoryMode,
+} from "@/lib/repository/factory";
+import { toClientVerificationMetadata } from "@/lib/repository/verification-presentation";
 import type { AnalyzeResponse } from "@/types/api";
 
 const inputSchema = z
@@ -47,11 +51,11 @@ export async function POST(request: Request) {
     decision,
     ...(verification
       ? {
-          verification: {
-            requestId: verification.requestId,
-            expiresAt: verification.expiresAt,
-            demoContactUrl: `${appUrl}/verify/${verification.rawToken}`,
-          },
+          verification: toClientVerificationMetadata(
+            resolveRepositoryMode(process.env.CIRCLECHECK_REPOSITORY_MODE),
+            verification,
+            appUrl,
+          ),
         }
       : {}),
   };

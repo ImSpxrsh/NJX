@@ -9,6 +9,10 @@ import {
   SupabaseCheckDataSource,
   SupabaseCheckRepository,
 } from "./supabase-check-repository";
+import {
+  SupabasePendingVerificationCreator,
+  SupabasePendingVerificationDataSource,
+} from "./supabase-pending-verification";
 
 function unsupported(name: string): never {
   throw new Error(`${name} is not configured for Supabase mode.`);
@@ -16,7 +20,9 @@ function unsupported(name: string): never {
 
 export function createSupabaseRepositories(
   client: SupabaseClient<Database>,
-  pendingVerificationCreator?: PendingVerificationCreator,
+  pendingVerificationCreator: PendingVerificationCreator = new SupabasePendingVerificationCreator(
+    new SupabasePendingVerificationDataSource(client),
+  ),
 ): CircleCheckRepositories {
   return {
     checks: new SupabaseCheckRepository(

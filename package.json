@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:types": "npx supabase gen types typescript --local > src/types/database.ts",
+    "test:db": "npx supabase test db",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

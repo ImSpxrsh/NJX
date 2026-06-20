@@ -53,6 +53,14 @@ transactional verification creator. If that operation is unavailable or fails,
 the repository throws and the persisted check remains `PAUSED`; it never returns
 a partially created PENDING check.
 
+`create_pending_verification` is the production transition boundary. It locks
+the PAUSED check row, verifies the contact belongs to the same household and has
+a verified destination, locks that contact row against concurrent reassignment,
+rejects an existing active request, inserts only the token hash, and transitions
+the check to PENDING in one database transaction. Contact selection is stable by
+enrollment time and ID. The function is executable only by the service role;
+database policy tests assert both the service-role grant and anonymous denial.
+
 The prototype does not yet have production household authentication. Until that
 is implemented, Supabase public check reads fail closed unless trusted server
 code supplies a household scope. Missing, unknown, and mismatched scopes all
