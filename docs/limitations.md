@@ -17,6 +17,10 @@
   multi-instance deployments need a shared store (CC-503).
 - Destination normalization is conservative and dependency-free; it is not full
   carrier-grade E.164 validation or a deliverability check.
+- The notification service (CC-203) ships with an in-memory transport; live SMS
+  (Twilio) and email transports are injected in production and are not wired here.
+- Notification idempotency and retry state are in-process; durable queues and a
+  shared idempotency store are production follow-ups.
 - The LLM provider is an interface with deterministic fallback, not a live model
   integration.
 - Small usability tests would not establish efficacy.

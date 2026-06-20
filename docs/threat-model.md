@@ -46,6 +46,20 @@ single-use, expiring, and rate-limited. Threats and mitigations:
 - **Failure handling** — any verification, infrastructure, or database failure
   leaves the destination unverified.
 
+## Notification delivery (CC-203)
+
+- **Delivery vs identity** — `DELIVERED` never implies `CONFIRMED`/`VERIFIED`; the
+  service cannot change trust state.
+- **Content exposure** — payloads carry only a destination and a sanitized body
+  (one-time link/code); no household id, raw message, secret, or state.
+- **URL/log leakage** — the email link contains only the token; the service logs
+  only coarse redacted fields (channel, error category, attempt count, request
+  id), never tokens, destinations, URLs, or bodies.
+- **Retry abuse** — bounded exponential backoff; idempotent by verification id;
+  retries never create additional tokens.
+- **Delivery failure** — leaves the check pending and returns manual callback
+  guidance to a known number.
+
 ## Outside prototype scope
 
 Production identity proofing, compromised trusted devices, SIM swaps, abusive
