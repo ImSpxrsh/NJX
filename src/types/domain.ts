@@ -97,6 +97,10 @@ export type HouseholdRecord = {
   createdAt: string;
 };
 
+// Channel a destination can be *verified* over. Distinct from the contact's
+// preferred delivery `channel`, which also allows "manual_demo".
+export type DestinationVerificationChannel = "sms" | "email";
+
 export type TrustedContactRecord = {
   id: string;
   householdId: string;
@@ -104,7 +108,31 @@ export type TrustedContactRecord = {
   phoneE164: string | null;
   email: string | null;
   channel: "sms" | "email" | "manual_demo";
+  // Destination-ownership verification state. The task's
+  // `verified`/`verified_at`/`verified_channel` map onto these as:
+  //   verified        = destinationVerifiedAt !== null
+  //   verified_at     = destinationVerifiedAt
+  //   verified_channel = destinationVerifiedChannel
+  // They are mutated ONLY by the destination-verification workflow and are
+  // always cleared on any enrollment write.
   destinationVerifiedAt: string | null;
+  destinationVerifiedChannel: DestinationVerificationChannel | null;
+  updatedAt: string;
+  createdAt: string;
+};
+
+// A short-lived, hashed one-time code proving the household controls a
+// destination. Completely separate from `VerificationRequestRecord` (which
+// verifies a suspicious *check* with an already-enrolled contact).
+export type ContactDestinationVerificationRecord = {
+  id: string;
+  trustedContactId: string;
+  householdId: string;
+  channel: DestinationVerificationChannel;
+  codeHash: string;
+  expiresAt: string;
+  attempts: number;
+  consumed: boolean;
   createdAt: string;
 };
 

@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type {
   CheckRecord,
+  ContactDestinationVerificationRecord,
   EnrollmentVerificationRecord,
   HouseholdRecord,
   PhoneAlertRecord,
@@ -17,6 +18,12 @@ import {
   isValidTokenFormat,
 } from "@/lib/security/tokens";
 import { sha256 } from "@/lib/security/hashing";
+import type {
+  CircleCheckRepositories,
+  ContactWriteInput,
+  DestinationChallengeInput,
+  VerificationContext,
+} from "./contracts";
 import type { CircleCheckRepositories, VerificationContext } from "./contracts";
 import {
   createEnrollmentDemoRepository,
@@ -29,13 +36,48 @@ export type DemoStore = {
   phoneCallIds: Set<string>;
   phoneAlerts: Map<string, PhoneAlertRecord>;
   contacts: Map<string, TrustedContactRecord>;
+  destinationChallenges: Map<string, ContactDestinationVerificationRecord>;
+};
+
+const householdId =
+  process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001";
+const contactId =
+  process.env.DEMO_TRUSTED_CONTACT_ID ?? "00000000-0000-4000-8000-000000000002";
+
+const demoHousehold: HouseholdRecord = {
+  id: householdId,
+  displayName: "CircleCheck Demo Household",
+  createdAt: new Date(0).toISOString(),
   enrollments: Map<string, EnrollmentVerificationRecord>;
 };
+
+function buildDemoContact(): TrustedContactRecord {
+  return {
+    id: contactId,
+    householdId,
+    displayName: "Demo Trusted Contact",
+    phoneE164: null,
+    email: "trusted-contact@example.test",
+    channel: "manual_demo",
+    destinationVerifiedAt: new Date(0).toISOString(),
+    destinationVerifiedChannel: "email",
+    updatedAt: new Date(0).toISOString(),
+    createdAt: new Date(0).toISOString(),
+  };
+}
+
+function seedContacts(target: Map<string, TrustedContactRecord>) {
+  target.set(contactId, buildDemoContact());
+}
 
 const globalStore = globalThis as typeof globalThis & {
   circleCheckStore?: DemoStore;
 };
 
+function createStore(): Store {
+  const contacts = new Map<string, TrustedContactRecord>();
+  seedContacts(contacts);
+  return {
 export const store =
   globalStore.circleCheckStore ??
   (globalStore.circleCheckStore = {
@@ -43,6 +85,14 @@ export const store =
     requests: new Map(),
     phoneCallIds: new Set(),
     phoneAlerts: new Map(),
+    contacts,
+    destinationChallenges: new Map(),
+  };
+}
+
+const store =
+  globalStore.circleCheckStore ??
+  (globalStore.circleCheckStore = createStore());
     contacts: new Map(),
     enrollments: new Map(),
   });
@@ -259,14 +309,20 @@ export function respondToVerification(
 
   request.usedAt = now;
   request.status = "COMPLETED";
-  check.state = transitionCheck(
-    check.state,
-    response === "CONFIRMED_MINE" ? "VERIFIED" : "DENIED",
-  );
+  // Narrow terminal state up front so the returned `state` is the contract's
+  // "VERIFIED" | "DENIED" rather than the wider CheckState.
+  const terminalState =
+    response === "CONFIRMED_MINE" ? ("VERIFIED" as const) : ("DENIED" as const);
+  check.state = transitionCheck(check.state, terminalState);
   check.updatedAt = now;
   check.statusSource = "ENROLLED_CONTACT";
   return {
     ok: true as const,
+    state: terminalState,
+    message:
+      terminalState === "VERIFIED"
+        ? "The enrolled contact confirmed making this request."
+        : "The enrolled contact denied making this request.",
     state: check.state,
     message: "Verification response recorded.",
   };
@@ -284,27 +340,124 @@ export function resetDemo() {
   store.requests.clear();
   store.phoneCallIds.clear();
   store.phoneAlerts.clear();
+  store.contacts.clear();
+  store.destinationChallenges.clear();
+  seedContacts(store.contacts);
   store.enrollments.clear();
   resetEnrollmentDemo();
   seedContacts();
 }
 
-const demoHousehold: HouseholdRecord = {
-  id: householdId,
-  displayName: "CircleCheck Demo Household",
-  createdAt: new Date(0).toISOString(),
-};
+// --- Trusted-contact enrollment (CC-101) ----------------------------------
 
-const demoContact: TrustedContactRecord = {
-  id: contactId,
-  householdId,
-  displayName: "Demo Trusted Contact",
-  phoneE164: null,
-  email: "trusted-contact@example.test",
-  channel: "manual_demo",
-  destinationVerifiedAt: new Date(0).toISOString(),
-  createdAt: new Date(0).toISOString(),
-};
+function requireDemoHousehold(id: string) {
+  // Demo mode serves exactly one household. Reject anything else at the
+  // repository boundary, mirroring checks.create's behavior.
+  if (id !== householdId) {
+    throw new Error("Demo household unavailable.");
+  }
+}
+
+function listContacts(forHousehold: string): TrustedContactRecord[] {
+  return [...store.contacts.values()]
+    .filter((contact) => contact.householdId === forHousehold)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((contact) => structuredClone(contact));
+}
+
+function createContact(input: ContactWriteInput): TrustedContactRecord {
+  requireDemoHousehold(input.householdId);
+  const now = new Date().toISOString();
+  const record: TrustedContactRecord = {
+    id: randomUUID(),
+    householdId: input.householdId,
+    displayName: input.displayName,
+    phoneE164: input.phoneE164,
+    email: input.email,
+    channel: input.channel,
+    // Enrollment NEVER produces a verified destination.
+    destinationVerifiedAt: null,
+    destinationVerifiedChannel: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  store.contacts.set(record.id, record);
+  return structuredClone(record);
+}
+
+function updateContact(
+  id: string,
+  input: Omit<ContactWriteInput, "householdId">,
+): TrustedContactRecord {
+  const existing = store.contacts.get(id);
+  if (!existing) throw new Error("Contact not found.");
+  const now = new Date().toISOString();
+  const updated: TrustedContactRecord = {
+    ...existing,
+    displayName: input.displayName,
+    phoneE164: input.phoneE164,
+    email: input.email,
+    channel: input.channel,
+    // SECURITY: any modification clears prior verification state so a changed
+    // phone/email must be re-verified.
+    destinationVerifiedAt: null,
+    destinationVerifiedChannel: null,
+    updatedAt: now,
+  };
+  store.contacts.set(id, updated);
+  // Outstanding challenges for this contact are no longer valid.
+  for (const challenge of store.destinationChallenges.values()) {
+    if (challenge.trustedContactId === id) challenge.consumed = true;
+  }
+  return structuredClone(updated);
+}
+
+function removeContact(id: string): void {
+  store.contacts.delete(id);
+  for (const [challengeId, challenge] of store.destinationChallenges) {
+    if (challenge.trustedContactId === id) {
+      store.destinationChallenges.delete(challengeId);
+    }
+  }
+}
+
+// --- Destination verification (separate workflow) -------------------------
+
+function createDestinationChallenge(
+  input: DestinationChallengeInput,
+): ContactDestinationVerificationRecord {
+  // Invalidate any prior active challenge so only the newest code can succeed.
+  for (const challenge of store.destinationChallenges.values()) {
+    if (challenge.trustedContactId === input.trustedContactId) {
+      challenge.consumed = true;
+    }
+  }
+  const record: ContactDestinationVerificationRecord = {
+    id: randomUUID(),
+    trustedContactId: input.trustedContactId,
+    householdId: input.householdId,
+    channel: input.channel,
+    codeHash: input.codeHash,
+    expiresAt: input.expiresAt,
+    attempts: 0,
+    consumed: false,
+    createdAt: new Date().toISOString(),
+  };
+  store.destinationChallenges.set(record.id, record);
+  return structuredClone(record);
+}
+
+function getActiveChallenge(
+  trustedContactId: string,
+): ContactDestinationVerificationRecord | null {
+  const active = [...store.destinationChallenges.values()]
+    .filter(
+      (challenge) =>
+        challenge.trustedContactId === trustedContactId && !challenge.consumed,
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return active.length ? structuredClone(active[0]) : null;
+}
 
 /** (Re)seed the canonical demo contact. Idempotent. */
 export function seedContacts(): void {
@@ -345,6 +498,63 @@ export function createDemoRepositories(): CircleCheckRepositories {
         return contact ? structuredClone(contact) : null;
       },
       async getVerifiedForHousehold(id) {
+        const verified = listContacts(id).find(
+          (contact) => contact.destinationVerifiedAt !== null,
+        );
+        return verified ?? null;
+      },
+      async listForHousehold(id) {
+        return listContacts(id);
+      },
+      async countForHousehold(id) {
+        return listContacts(id).length;
+      },
+      async create(input) {
+        return createContact(input);
+      },
+      async update(id, input) {
+        return updateContact(id, input);
+      },
+      async remove(id) {
+        removeContact(id);
+      },
+    },
+    contactVerifications: {
+      async createChallenge(input) {
+        return createDestinationChallenge(input);
+      },
+      async getActiveChallenge(trustedContactId) {
+        return getActiveChallenge(trustedContactId);
+      },
+      async registerFailedAttempt(challengeId) {
+        const challenge = store.destinationChallenges.get(challengeId);
+        if (!challenge) return 0;
+        challenge.attempts += 1;
+        return challenge.attempts;
+      },
+      async expireChallenge(challengeId) {
+        const challenge = store.destinationChallenges.get(challengeId);
+        if (challenge) challenge.consumed = true;
+      },
+      async completeChallenge(input) {
+        // Atomic in production (a SECURITY DEFINER function); trivially atomic
+        // here. Consume the challenge and mark the destination verified.
+        const challenge = store.destinationChallenges.get(input.challengeId);
+        if (challenge) challenge.consumed = true;
+        const contact = store.contacts.get(input.trustedContactId);
+        if (!contact) throw new Error("Contact not found.");
+        contact.destinationVerifiedAt = input.verifiedAt;
+        contact.destinationVerifiedChannel = input.channel;
+        contact.updatedAt = input.verifiedAt;
+        return structuredClone(contact);
+      },
+      async countStartsSince(id, sinceIso) {
+        const since = Date.parse(sinceIso);
+        return [...store.destinationChallenges.values()].filter(
+          (challenge) =>
+            challenge.householdId === id &&
+            Date.parse(challenge.createdAt) >= since,
+        ).length;
         // Only a destination-verified contact may receive a high-trust request.
         for (const contact of store.contacts.values()) {
           if (
