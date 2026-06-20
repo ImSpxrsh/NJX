@@ -36,6 +36,8 @@ export type Database = {
           email: string | null;
           channel: string;
           destination_verified_at: string | null;
+          destination_verified_channel: "sms" | "email" | null;
+          updated_at: string;
           created_at: string;
         };
         Insert: {
@@ -46,6 +48,8 @@ export type Database = {
           email?: string | null;
           channel: string;
           destination_verified_at?: string | null;
+          destination_verified_channel?: "sms" | "email" | null;
+          updated_at?: string;
           created_at?: string;
         };
         Update: {
@@ -56,6 +60,8 @@ export type Database = {
           email?: string | null;
           channel?: string;
           destination_verified_at?: string | null;
+          destination_verified_channel?: "sms" | "email" | null;
+          updated_at?: string;
           created_at?: string;
         };
         Relationships: [
@@ -78,6 +84,8 @@ export type Database = {
           sanitized_summary: string;
           evidence_json: Json;
           policy_reasons: Json;
+          requested_action: string | null;
+          status_source: "POLICY_ENGINE" | "ENROLLED_CONTACT" | "NO_RESPONSE" | "SYSTEM_EXPIRY";
           created_at: string;
           updated_at: string;
           expires_at: string | null;
@@ -91,6 +99,8 @@ export type Database = {
           sanitized_summary: string;
           evidence_json: Json;
           policy_reasons: Json;
+          requested_action?: string | null;
+          status_source?: "POLICY_ENGINE" | "ENROLLED_CONTACT" | "NO_RESPONSE" | "SYSTEM_EXPIRY";
           created_at?: string;
           updated_at?: string;
           expires_at?: string | null;
@@ -104,6 +114,8 @@ export type Database = {
           sanitized_summary?: string;
           evidence_json?: Json;
           policy_reasons?: Json;
+          requested_action?: string | null;
+          status_source?: "POLICY_ENGINE" | "ENROLLED_CONTACT" | "NO_RESPONSE" | "SYSTEM_EXPIRY";
           created_at?: string;
           updated_at?: string;
           expires_at?: string | null;
@@ -241,6 +253,13 @@ export type Database = {
         Returns: {
           result_state: Database["public"]["Enums"]["check_state"];
           result_message: string;
+        }[];
+      };
+      expire_pending_checks: {
+        Args: Record<string, never>;
+        Returns: {
+          expired_checks: number;
+          expired_requests: number;
         }[];
       };
     };
