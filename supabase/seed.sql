@@ -12,3 +12,9 @@ insert into public.trusted_contacts (
   'manual_demo',
   now()
 ) on conflict do nothing;
+
+insert into public.phone_caller_mappings (household_id, caller_phone_hash)
+values (
+  '00000000-0000-4000-8000-000000000001',
+  encode(digest('+15555550100', 'sha256'), 'hex')
+) on conflict do nothing;

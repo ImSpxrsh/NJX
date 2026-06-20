@@ -13,6 +13,15 @@ export type EvidenceSignal = {
   explanation: string;
 };
 
+export type EvidenceExtractionMetadata = {
+  promptVersion: string;
+  deterministicRuleVersion: string;
+  provider: string;
+  model: string | null;
+  fallbackUsed: boolean;
+  ruleIds?: string[];
+};
+
 export type PublicEvidenceSignal = Omit<EvidenceSignal, "evidenceSpans">;
 
 export type EvidenceExtraction = {
@@ -22,6 +31,7 @@ export type EvidenceExtraction = {
   signals: Record<SignalName, EvidenceSignal>;
   uncertainty: boolean;
   plainLanguageSummary: string;
+  metadata?: EvidenceExtractionMetadata;
 };
 
 export type VerificationLevel = "L0" | "L1" | "L2" | "L3";
@@ -112,7 +122,12 @@ export type PhoneAlertRecord = {
   id: string;
   householdId: string;
   checkId: string;
+  verificationRequestId: string;
   callSidHash: string;
   pressedDigit: "1";
   createdAt: string;
+};
+
+export type PhoneCallerRoute = {
+  householdId: string;
 };

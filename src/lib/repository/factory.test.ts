@@ -48,6 +48,7 @@ describe("repository factory", () => {
         "trustedContacts",
         "verificationRequests",
         "phoneAlerts",
+        "verificationNotifications",
         "households",
       ]),
     );

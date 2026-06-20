@@ -4,6 +4,7 @@ import type {
   CheckRecord,
   HouseholdRecord,
   PhoneAlertRecord,
+  PhoneCallerRoute,
   PublicCheckRecord,
   TrustedContactRecord,
   VerificationRequestRecord,
@@ -16,13 +17,16 @@ import {
   isValidTokenFormat,
 } from "@/lib/security/tokens";
 import { sha256 } from "@/lib/security/hashing";
+import { normalizePhoneE164 } from "@/lib/security/phone";
 import type { CircleCheckRepositories, VerificationContext } from "./contracts";
+import type { VerificationNotification } from "./contracts";
 
 type Store = {
   checks: Map<string, CheckRecord>;
   requests: Map<string, VerificationRequestRecord>;
   phoneCallIds: Set<string>;
   phoneAlerts: Map<string, PhoneAlertRecord>;
+  verificationNotifications: Map<string, VerificationNotification>;
 };
 
 const globalStore = globalThis as typeof globalThis & {
@@ -36,12 +40,14 @@ const store =
     requests: new Map(),
     phoneCallIds: new Set(),
     phoneAlerts: new Map(),
+    verificationNotifications: new Map(),
   });
 
 const householdId =
   process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001";
 const contactId =
   process.env.DEMO_TRUSTED_CONTACT_ID ?? "00000000-0000-4000-8000-000000000002";
+const defaultCallerPhone = "+15555550100";
 
 export function createCheck(input: {
   extraction: EvidenceExtraction;
@@ -241,11 +247,70 @@ export function registerPhoneCall(callSid: string): boolean {
   return true;
 }
 
+export function resolveHouseholdForCaller(
+  caller: string | null | undefined,
+): PhoneCallerRoute | null {
+  const normalizedCaller = normalizePhoneE164(caller);
+  const configuredCaller = normalizePhoneE164(
+    process.env.DEMO_CALLER_PHONE_E164 ?? defaultCallerPhone,
+  );
+  if (
+    !normalizedCaller ||
+    !configuredCaller ||
+    sha256(normalizedCaller) !== sha256(configuredCaller)
+  ) {
+    return null;
+  }
+  return { householdId };
+}
+
+export function recordPhoneAlert(input: {
+  callSid: string;
+  householdId: string;
+  checkId: string;
+  verificationRequestId: string;
+  pressedDigit: "1";
+}): PhoneAlertRecord {
+  const callSidHash = sha256(input.callSid);
+  const existing = store.phoneAlerts.get(callSidHash);
+  if (existing) return structuredClone(existing);
+  const now = new Date().toISOString();
+  const alert: PhoneAlertRecord = {
+    id: randomUUID(),
+    householdId: input.householdId,
+    checkId: input.checkId,
+    verificationRequestId: input.verificationRequestId,
+    callSidHash,
+    pressedDigit: input.pressedDigit,
+    createdAt: now,
+  };
+  store.phoneAlerts.set(callSidHash, alert);
+  return structuredClone(alert);
+}
+
+export function sendVerificationLink(input: {
+  requestId: string;
+  rawToken: string;
+  appUrl: string;
+}): VerificationNotification {
+  if (process.env.DEMO_NOTIFICATION_FAIL === "1") {
+    throw new Error("Demo notification delivery failed.");
+  }
+  const notification: VerificationNotification = {
+    requestId: input.requestId,
+    verificationUrl: `${input.appUrl.replace(/\/$/, "")}/verify/${input.rawToken}`,
+    deliveredAt: new Date().toISOString(),
+  };
+  store.verificationNotifications.set(input.requestId, notification);
+  return structuredClone(notification);
+}
+
 export function resetDemo() {
   store.checks.clear();
   store.requests.clear();
   store.phoneCallIds.clear();
   store.phoneAlerts.clear();
+  store.verificationNotifications.clear();
 }
 
 const demoHousehold: HouseholdRecord = {
@@ -311,12 +376,27 @@ export function createDemoRepositories(): CircleCheckRepositories {
       },
     },
     phoneAlerts: {
+      async resolveHouseholdForCaller(caller) {
+        return resolveHouseholdForCaller(caller);
+      },
       async registerCall(callSid) {
         return registerPhoneCall(callSid);
+      },
+      async recordAlert(input) {
+        return recordPhoneAlert(input);
       },
       async getInternalByCallHash(callSidHash) {
         const alert = store.phoneAlerts.get(callSidHash);
         return alert ? structuredClone(alert) : null;
+      },
+    },
+    verificationNotifications: {
+      async sendVerificationLink(input) {
+        return sendVerificationLink(input);
+      },
+      async getInternalByRequestId(requestId) {
+        const notification = store.verificationNotifications.get(requestId);
+        return notification ? structuredClone(notification) : null;
       },
     },
     households: {

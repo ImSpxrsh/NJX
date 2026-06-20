@@ -31,3 +31,13 @@ describe("consume_verification_token migration", () => {
     expect(functionBody).not.toContain("raise exception");
   });
 });
+
+describe("phone caller mapping migration", () => {
+  it("stores caller routes by hash under RLS", () => {
+    expect(migration).toContain("create table public.phone_caller_mappings");
+    expect(migration).toContain("caller_phone_hash text not null unique");
+    expect(migration).toContain(
+      "alter table public.phone_caller_mappings enable row level security",
+    );
+  });
+});

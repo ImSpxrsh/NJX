@@ -28,14 +28,17 @@ export async function POST(request: Request) {
   }
   const callSid = params.CallSid ?? "missing-call-id";
   const repositories = getRepositories();
-  if (await repositories.phoneAlerts.registerCall(callSid)) {
+  const appUrl = process.env.PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const callerRoute = await repositories.phoneAlerts.resolveHouseholdForCaller(
+    params.From,
+  );
+  if (callerRoute && (await repositories.phoneAlerts.registerCall(callSid))) {
     const extraction = await new FixtureEvidenceExtractor().extract({
       text: "Urgent phone alert involving money, gift cards, a password, or a verification code.",
       requestId: crypto.randomUUID(),
     });
-    await repositories.checks.create({
-      householdId:
-        process.env.DEMO_HOUSEHOLD_ID ?? "00000000-0000-4000-8000-000000000001",
+    const created = await repositories.checks.create({
+      householdId: callerRoute.householdId,
       extraction,
       decision: {
         ...evaluatePolicy(extraction),
@@ -45,6 +48,22 @@ export async function POST(request: Request) {
       },
       source: "phone",
     });
+    await repositories.phoneAlerts.recordAlert({
+      callSid,
+      householdId: callerRoute.householdId,
+      checkId: created.check.id,
+      verificationRequestId: created.verification?.requestId ?? "",
+      pressedDigit: "1",
+    });
+    if (created.verification?.rawToken) {
+      await repositories.verificationNotifications
+        .sendVerificationLink({
+          requestId: created.verification.requestId,
+          rawToken: created.verification.rawToken,
+          appUrl,
+        })
+        .catch(() => null);
+    }
   }
   response.say(
     "Do not send anything yet. Hang up and call the trusted number printed on your CircleCheck card.",

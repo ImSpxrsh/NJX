@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "eval:evidence": "vitest run src/evals/evidence-eval.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

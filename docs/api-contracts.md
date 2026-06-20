@@ -33,8 +33,12 @@ one-digit Gather. It configures no recording or transcription.
 
 ## `POST /api/twilio/gather`
 
-Digit 1 creates an idempotent phone-originated pending verification. Other
-digits create no approval. CallSid is represented only by a SHA-256 hash.
+Digit 1 from a preconfigured caller route creates an idempotent phone-originated
+pending verification. Unknown callers receive the same printed-card safety
+instruction with no household disclosure. Other digits create no approval.
+CallSid is represented only by a SHA-256 hash. Known caller alerts deliver the
+same one-time trusted-contact verification link used by web checks. Delivery
+failure does not change the TwiML safety instruction or lower friction.
 
 ## `POST /api/demo/reset`
 
