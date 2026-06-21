@@ -11,7 +11,6 @@ import type {
   VerificationLevel,
 } from "./domain";
 
-// Production response — never contains verification tokens or demo-only fields.
 export type AnalyzeProductionResponse = {
   checkId: string;
   state: "PAUSED" | "PENDING";
@@ -23,9 +22,6 @@ export type AnalyzeProductionResponse = {
   };
 };
 
-// Demo response — only returned from an explicitly enabled demo deployment.
-export type AnalyzeDemoResponse = AnalyzeProductionResponse & {
-  demoContactUrl: string;
 export type AnalyzeDemoResponse = Omit<
   AnalyzeProductionResponse,
   "verification"

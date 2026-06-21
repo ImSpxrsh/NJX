@@ -3,7 +3,14 @@ import { copy } from "./copy";
 
 describe("security copy registry", () => {
   it("covers all check states", () => {
-    const states: string[] = ["RECEIVED", "PAUSED", "PENDING", "VERIFIED", "DENIED", "EXPIRED"];
+    const states: string[] = [
+      "RECEIVED",
+      "PAUSED",
+      "PENDING",
+      "VERIFIED",
+      "DENIED",
+      "EXPIRED",
+    ];
     for (const state of states) {
       expect(copy.states[state as keyof typeof copy.states]).toBeDefined();
     }
@@ -31,7 +38,9 @@ describe("security copy registry", () => {
 
   it("failure copy instructs not to act", () => {
     for (const msg of Object.values(copy.failures)) {
-      expect(msg.toLowerCase()).toMatch(/do not act|safety card|number you already know|verify/i);
+      expect(msg.toLowerCase()).toMatch(
+        /do not act|safety card|number you already know|verify/i,
+      );
     }
   });
 });

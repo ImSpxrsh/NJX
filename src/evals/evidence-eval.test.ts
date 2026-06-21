@@ -21,7 +21,9 @@ const signals: SignalName[] = [
 
 function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0;
+  return (
+    sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0
+  );
 }
 
 describe("evidence extraction evaluation", () => {
@@ -29,10 +31,7 @@ describe("evidence extraction evaluation", () => {
     const extractor = new FixtureEvidenceExtractor();
     const latency: number[] = [];
     const counts = Object.fromEntries(
-      signals.map((signal) => [
-        signal,
-        { tp: 0, fp: 0, fn: 0 },
-      ]),
+      signals.map((signal) => [signal, { tp: 0, fp: 0, fn: 0 }]),
     ) as Record<SignalName, { tp: number; fp: number; fn: number }>;
     let schemaValid = 0;
     let fallback = 0;
@@ -57,7 +56,9 @@ describe("evidence extraction evaluation", () => {
       const decision = evaluatePolicy(extraction);
       if (levels.indexOf(decision.level) < levels.indexOf(item.minimumLevel)) {
         minimumLevelViolations += 1;
-        minimumLevelViolationIds.push(`${item.id}:${decision.level}<${item.minimumLevel}`);
+        minimumLevelViolationIds.push(
+          `${item.id}:${decision.level}<${item.minimumLevel}`,
+        );
       }
       for (const signal of signals) {
         const expected = item.expectedPresentSignals.includes(signal);

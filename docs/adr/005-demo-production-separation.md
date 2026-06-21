@@ -4,9 +4,11 @@
 **Status:** Accepted
 
 ## Context
+
 A demo mode is needed for local development and presentations. Initially, demo behavior (including `demoContactUrl` with embedded raw tokens) leaked into the production response path.
 
 ## Decision
+
 - A server-side `RuntimeConfig` module (`lib/runtime-mode.ts`) is the single source of truth for demo mode.
 - Demo mode requires `CIRCLECHECK_REPOSITORY_MODE=demo` with `NODE_ENV` ≠ `production`.
 - Contradictory configuration (`NODE_ENV=production` + demo mode) resolves to production, never demo.
@@ -16,6 +18,7 @@ A demo mode is needed for local development and presentations. Initially, demo b
 - `demoContactUrl` (containing a raw token) is only present in demo responses.
 
 ## Consequences
+
 - The demo mode check must be imported before any response serialization.
 - Tests that exercise demo behavior must set `CIRCLECHECK_REPOSITORY_MODE=demo` and `NODE_ENV=test`.
 - A banner visible to all users must appear in demo deployments.

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { FixtureEvidenceExtractor } from "./fixture-extractor";
-import { LlmEvidenceExtractor, type EvidenceModelProvider } from "./llm-extractor";
+import {
+  LlmEvidenceExtractor,
+  type EvidenceModelProvider,
+} from "./llm-extractor";
 import type { EvidenceExtraction } from "@/types/domain";
 import { evaluatePolicy } from "@/lib/policy/evaluate-policy";
 

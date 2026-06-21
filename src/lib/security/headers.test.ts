@@ -21,5 +21,8 @@ describe("security headers", () => {
     ).toEqual(
       expect.arrayContaining([{ key: "Cache-Control", value: "no-store" }]),
     );
+    expect(
+      all.find((header) => header.key === "Content-Security-Policy")?.value,
+    ).toContain("'unsafe-eval'");
   });
 });

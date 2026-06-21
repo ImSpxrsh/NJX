@@ -81,6 +81,7 @@ The prototype does not yet have production household authentication. Until that
 is implemented, Supabase public check reads fail closed unless trusted server
 code supplies a household scope. Missing, unknown, and mismatched scopes all
 produce the same not-found result and return no household or contact metadata.
+
 ## Enrollment destination verification
 
 Destination verification (CC-202) is a separate subsystem from request

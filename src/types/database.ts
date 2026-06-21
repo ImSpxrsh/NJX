@@ -85,7 +85,11 @@ export type Database = {
           evidence_json: Json;
           policy_reasons: Json;
           requested_action: string | null;
-          status_source: "POLICY_ENGINE" | "ENROLLED_CONTACT" | "NO_RESPONSE" | "SYSTEM_EXPIRY";
+          status_source:
+            | "POLICY_ENGINE"
+            | "ENROLLED_CONTACT"
+            | "NO_RESPONSE"
+            | "SYSTEM_EXPIRY";
           created_at: string;
           updated_at: string;
           expires_at: string | null;
@@ -100,7 +104,11 @@ export type Database = {
           evidence_json: Json;
           policy_reasons: Json;
           requested_action?: string | null;
-          status_source?: "POLICY_ENGINE" | "ENROLLED_CONTACT" | "NO_RESPONSE" | "SYSTEM_EXPIRY";
+          status_source?:
+            | "POLICY_ENGINE"
+            | "ENROLLED_CONTACT"
+            | "NO_RESPONSE"
+            | "SYSTEM_EXPIRY";
           created_at?: string;
           updated_at?: string;
           expires_at?: string | null;
@@ -115,7 +123,11 @@ export type Database = {
           evidence_json?: Json;
           policy_reasons?: Json;
           requested_action?: string | null;
-          status_source?: "POLICY_ENGINE" | "ENROLLED_CONTACT" | "NO_RESPONSE" | "SYSTEM_EXPIRY";
+          status_source?:
+            | "POLICY_ENGINE"
+            | "ENROLLED_CONTACT"
+            | "NO_RESPONSE"
+            | "SYSTEM_EXPIRY";
           created_at?: string;
           updated_at?: string;
           expires_at?: string | null;

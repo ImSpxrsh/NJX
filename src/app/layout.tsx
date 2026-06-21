@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { DemoBanner } from "@/components/DemoBanner";
-import { getRuntimeConfig } from "@/lib/runtime-mode";
 import { DemoModeBanner } from "@/components/accessibility/DemoModeBanner";
 import { getRuntimeConfig } from "@/lib/runtime-config";
 
@@ -14,13 +12,6 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Runtime config is resolved server-side; the browser cannot influence
-  // whether the demo banner appears.
-  const { isDemo } = getRuntimeConfig();
-  return (
-    <html lang="en">
-      <body>
-        {isDemo && <DemoBanner />}
   const runtime = getRuntimeConfig();
   return (
     <html lang="en">

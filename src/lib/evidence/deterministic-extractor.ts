@@ -67,7 +67,10 @@ function extractSpans(text: string, patterns: RegExp[]): string[] {
 
 // Test a pattern safely (resets lastIndex before use)
 function patternMatches(pattern: RegExp, text: string): boolean {
-  const cloned = new RegExp(pattern.source, pattern.flags.replace("g", "") + "iu");
+  const cloned = new RegExp(
+    pattern.source,
+    pattern.flags.replace("g", "") + "iu",
+  );
   return cloned.test(text);
 }
 
@@ -76,15 +79,39 @@ const SIGNAL_RULES: SignalRules[] = [
     name: "urgency",
     rules: [
       { id: "urgency-right-now", pattern: /\bright\s+now\b/, weight: 0.7 },
-      { id: "urgency-asap", pattern: /\basap\b|\bas soon as possible\b/, weight: 0.6 },
-      { id: "urgency-immediately", pattern: /\bimmediately\b|\burgent(?:ly)?\b/, weight: 0.6 },
+      {
+        id: "urgency-asap",
+        pattern: /\basap\b|\bas soon as possible\b/,
+        weight: 0.6,
+      },
+      {
+        id: "urgency-immediately",
+        pattern: /\bimmediately\b|\burgent(?:ly)?\b/,
+        weight: 0.6,
+      },
       { id: "urgency-hurry", pattern: /\bhurry\b/, weight: 0.4 },
-      { id: "urgency-time-running-out", pattern: /\bno time\b|\btime is running out\b/, weight: 0.7 },
+      {
+        id: "urgency-time-running-out",
+        pattern: /\bno time\b|\btime is running out\b/,
+        weight: 0.7,
+      },
       { id: "urgency-deadline", pattern: /\bdeadline\b/, weight: 0.4 },
-      { id: "urgency-emergency", pattern: /\bemergency\b|\bcrisis\b/, weight: 0.7 },
-      { id: "urgency-locked", pattern: /\blocked\b|\bfinal notice\b|\blast chance\b/, weight: 0.6 },
+      {
+        id: "urgency-emergency",
+        pattern: /\bemergency\b|\bcrisis\b/,
+        weight: 0.7,
+      },
+      {
+        id: "urgency-locked",
+        pattern: /\blocked\b|\bfinal notice\b|\blast chance\b/,
+        weight: 0.6,
+      },
       { id: "urgency-today", pattern: /\btoday\b|\bnow\b/, weight: 0.3 },
-      { id: "urgency-quick", pattern: /\bquick(?:ly)?\b|\bfast\b/, weight: 0.3 },
+      {
+        id: "urgency-quick",
+        pattern: /\bquick(?:ly)?\b|\bfast\b/,
+        weight: 0.3,
+      },
       { id: "urgency-caps-inject", pattern: /\bURGENT\b|!!+/, weight: 0.3 },
     ],
     explanationTemplate: (score, spans) =>
@@ -95,12 +122,32 @@ const SIGNAL_RULES: SignalRules[] = [
   {
     name: "secrecy",
     rules: [
-      { id: "secrecy-dont-tell", pattern: /\bdon'?t tell\b|\bdo not tell\b/, weight: 0.8 },
-      { id: "secrecy-keep-secret", pattern: /\bkeep (?:it |this )?(?:secret|quiet|between us)\b/, weight: 0.8 },
-      { id: "secrecy-dont-call", pattern: /\bdon'?t call\b|\bdo not call\b|\bdon'?t contact\b/, weight: 0.6 },
+      {
+        id: "secrecy-dont-tell",
+        pattern: /\bdon'?t tell\b|\bdo not tell\b/,
+        weight: 0.8,
+      },
+      {
+        id: "secrecy-keep-secret",
+        pattern: /\bkeep (?:it |this )?(?:secret|quiet|between us)\b/,
+        weight: 0.8,
+      },
+      {
+        id: "secrecy-dont-call",
+        pattern: /\bdon'?t call\b|\bdo not call\b|\bdon'?t contact\b/,
+        weight: 0.6,
+      },
       { id: "secrecy-between-us", pattern: /\bbetween us\b/, weight: 0.7 },
-      { id: "secrecy-no-one-else", pattern: /\bno one else\b|\bno one should know\b/, weight: 0.7 },
-      { id: "secrecy-dont-mention", pattern: /\bdon'?t mention\b|\bquiet about\b/, weight: 0.6 },
+      {
+        id: "secrecy-no-one-else",
+        pattern: /\bno one else\b|\bno one should know\b/,
+        weight: 0.7,
+      },
+      {
+        id: "secrecy-dont-mention",
+        pattern: /\bdon'?t mention\b|\bquiet about\b/,
+        weight: 0.6,
+      },
       { id: "secrecy-omit", pattern: /\bomit\b/, weight: 0.5 },
       { id: "secrecy-secret", pattern: /\bsecret\b/, weight: 0.5 },
     ],
@@ -112,15 +159,47 @@ const SIGNAL_RULES: SignalRules[] = [
   {
     name: "payment",
     rules: [
-      { id: "payment-gift-card", pattern: /\bgift\s*cards?\b|\bprepaid cards?\b/, weight: 0.9 },
-      { id: "payment-wire-transfer", pattern: /\bwire transfer\b|\bbank transfer\b/, weight: 0.9 },
+      {
+        id: "payment-gift-card",
+        pattern: /\bgift\s*cards?\b|\bprepaid cards?\b/,
+        weight: 0.9,
+      },
+      {
+        id: "payment-wire-transfer",
+        pattern: /\bwire transfer\b|\bbank transfer\b/,
+        weight: 0.9,
+      },
       { id: "payment-wire", pattern: /\bwire\b/, weight: 0.7 },
-      { id: "payment-crypto", pattern: /\bcrypto(?:currency)?\b|\bbitcoin\b|\bethereum\b|\bwallet\b/, weight: 0.8 },
-      { id: "payment-western-union", pattern: /\bwestern union\b|\bmoneygram\b|\bmoney order\b/, weight: 0.8 },
-      { id: "payment-send-money", pattern: /\bsend money\b|\bsend\s*(?:me\s*)?\$\d+/, weight: 0.8 },
-      { id: "payment-transfer-funds", pattern: /\btransfer funds?\b|\btransfer cash\b/, weight: 0.7 },
-      { id: "payment-apps", pattern: /\bzelle\b|\bvenmo\b|\bcash\s*app\b|\bcashapp\b/, weight: 0.7 },
-      { id: "payment-routing", pattern: /\baccount number\b|\brouting number\b/, weight: 0.8 },
+      {
+        id: "payment-crypto",
+        pattern: /\bcrypto(?:currency)?\b|\bbitcoin\b|\bethereum\b|\bwallet\b/,
+        weight: 0.8,
+      },
+      {
+        id: "payment-western-union",
+        pattern: /\bwestern union\b|\bmoneygram\b|\bmoney order\b/,
+        weight: 0.8,
+      },
+      {
+        id: "payment-send-money",
+        pattern: /\bsend money\b|\bsend\s*(?:me\s*)?\$\d+/,
+        weight: 0.8,
+      },
+      {
+        id: "payment-transfer-funds",
+        pattern: /\btransfer funds?\b|\btransfer cash\b/,
+        weight: 0.7,
+      },
+      {
+        id: "payment-apps",
+        pattern: /\bzelle\b|\bvenmo\b|\bcash\s*app\b|\bcashapp\b/,
+        weight: 0.7,
+      },
+      {
+        id: "payment-routing",
+        pattern: /\baccount number\b|\brouting number\b/,
+        weight: 0.8,
+      },
       { id: "payment-cash", pattern: /\bcash\b/, weight: 0.4 },
       { id: "payment-money", pattern: /\bmoney\b/, weight: 0.4 },
       { id: "payment-funds", pattern: /\bfunds?\b/, weight: 0.4 },
@@ -134,13 +213,30 @@ const SIGNAL_RULES: SignalRules[] = [
   {
     name: "credentials",
     rules: [
-      { id: "cred-password", pattern: /\bpassword\b|\bpasscode\b/, weight: 0.9 },
-      { id: "cred-otp", pattern: /\bone.?time.?(?:code|password|pin)\b|\botp\b/, weight: 0.9 },
-      { id: "cred-verification-code", pattern: /\bverification code\b|\bsix.?digit code\b|\bsecurity code\b|\blog(?:in)? code\b|\bbank code\b/, weight: 0.9 },
+      {
+        id: "cred-password",
+        pattern: /\bpassword\b|\bpasscode\b/,
+        weight: 0.9,
+      },
+      {
+        id: "cred-otp",
+        pattern: /\bone.?time.?(?:code|password|pin)\b|\botp\b/,
+        weight: 0.9,
+      },
+      {
+        id: "cred-verification-code",
+        pattern:
+          /\bverification code\b|\bsix.?digit code\b|\bsecurity code\b|\blog(?:in)? code\b|\bbank code\b/,
+        weight: 0.9,
+      },
       { id: "cred-ssn", pattern: /\bsocial security\b|\bssn\b/, weight: 0.95 },
       { id: "cred-pin", pattern: /\bpin\b/, weight: 0.7 },
       { id: "cred-2fa", pattern: /\b2fa\b|\bmfa\b/, weight: 0.85 },
-      { id: "cred-login-details", pattern: /\blog(?:in|.?in)\b.*(?:information|credentials|details)\b/, weight: 0.8 },
+      {
+        id: "cred-login-details",
+        pattern: /\blog(?:in|.?in)\b.*(?:information|credentials|details)\b/,
+        weight: 0.8,
+      },
     ],
     explanationTemplate: (score, spans) =>
       score >= PRESENCE_THRESHOLD
@@ -150,13 +246,38 @@ const SIGNAL_RULES: SignalRules[] = [
   {
     name: "changed_contact",
     rules: [
-      { id: "changed-new-number", pattern: /\bnew number\b|\bnew phone\b/, weight: 0.8 },
-      { id: "changed-different", pattern: /\bdifferent phone\b|\bchanged? (?:my )?(?:phone|number)\b/, weight: 0.8 },
-      { id: "changed-lost", pattern: /\blost my phone\b|\bphone broke\b/, weight: 0.7 },
-      { id: "changed-call-here", pattern: /\bcall me (?:here|at|on)\b|\btext me here\b/, weight: 0.6 },
+      {
+        id: "changed-new-number",
+        pattern: /\bnew number\b|\bnew phone\b/,
+        weight: 0.8,
+      },
+      {
+        id: "changed-different",
+        pattern: /\bdifferent phone\b|\bchanged? (?:my )?(?:phone|number)\b/,
+        weight: 0.8,
+      },
+      {
+        id: "changed-lost",
+        pattern: /\blost my phone\b|\bphone broke\b/,
+        weight: 0.7,
+      },
+      {
+        id: "changed-call-here",
+        pattern: /\bcall me (?:here|at|on)\b|\btext me here\b/,
+        weight: 0.6,
+      },
       { id: "changed-temporary", pattern: /\btemporary number\b/, weight: 0.7 },
-      { id: "changed-got-new", pattern: /\bI (?:got|have) a new (?:phone|number)\b/, weight: 0.75 },
-      { id: "changed-old-number", pattern: /\bold (?:number|phone)\b|\bnumber.*\bunreliable\b|\bunreliable.*\bnumber\b/, weight: 0.6 },
+      {
+        id: "changed-got-new",
+        pattern: /\bI (?:got|have) a new (?:phone|number)\b/,
+        weight: 0.75,
+      },
+      {
+        id: "changed-old-number",
+        pattern:
+          /\bold (?:number|phone)\b|\bnumber.*\bunreliable\b|\bunreliable.*\bnumber\b/,
+        weight: 0.6,
+      },
     ],
     explanationTemplate: (score, spans) =>
       score >= PRESENCE_THRESHOLD
@@ -208,7 +329,8 @@ function generateSummary(
 function extractRequestedAction(
   signals: EvidenceExtraction["signals"],
 ): string | null {
-  if (signals.credentials.present) return "Share a password or verification code";
+  if (signals.credentials.present)
+    return "Share a password or verification code";
   if (signals.payment.present) return "Send money or a financial equivalent";
   if (signals.changed_contact.present) return "Use a changed contact method";
   return null;
@@ -247,7 +369,10 @@ export class DeterministicEvidenceExtractor {
     const signals = {} as EvidenceExtraction["signals"];
 
     for (const signalDef of SIGNAL_RULES) {
-      const { score, spans, ruleIds } = scoreSignal(normalized, signalDef.rules);
+      const { score, spans, ruleIds } = scoreSignal(
+        normalized,
+        signalDef.rules,
+      );
       const present = score >= PRESENCE_THRESHOLD;
       allRuleIds.push(...ruleIds);
       signals[signalDef.name] = {
