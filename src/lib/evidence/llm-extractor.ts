@@ -7,10 +7,7 @@ import type {
 import { FixtureEvidenceExtractor } from "./fixture-extractor";
 import { evidenceExtractionSchema } from "./schema";
 import { evidenceSystemInstruction, wrapUntrustedMessage } from "./prompt";
-import {
-  DETERMINISTIC_RULE_VERSION,
-  PROMPT_VERSION,
-} from "./versions";
+import { DETERMINISTIC_RULE_VERSION, PROMPT_VERSION } from "./versions";
 
 type ProviderMetadata = {
   provider: string;
@@ -117,7 +114,8 @@ function combineEvidence(
     ]),
   ) as Record<SignalName, EvidenceSignal>;
   const disagreement = (Object.keys(signals) as SignalName[]).some(
-    (name) => deterministic.signals[name].present !== model.signals[name].present,
+    (name) =>
+      deterministic.signals[name].present !== model.signals[name].present,
   );
   return evidenceExtractionSchema.parse({
     ...deterministic,

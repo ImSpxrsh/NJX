@@ -14,7 +14,13 @@ struct ContentView: View {
                 Text("CircleCheck")
                     .font(.headline)
                 Spacer()
-                SettingsLink {
+                Button {
+                    NSApp.sendAction(
+                        Selector(("showSettingsWindow:")),
+                        to: nil,
+                        from: nil
+                    )
+                } label: {
                     Image(systemName: "gear")
                         .foregroundStyle(.secondary)
                 }

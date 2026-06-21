@@ -22,19 +22,29 @@ export const copy = {
 
   actions: {
     NONE: "No further action required at this time.",
-    KNOWN_NUMBER_CALLBACK: "If unsure, call back using a number you already know — not one from this message.",
-    TRUSTED_CONTACT_CONFIRMATION: "Stop. Contact your trusted person through a separate channel before acting.",
-    MANDATORY_HOLD_AND_VERIFY: "Do not act on this request. Contact your trusted person through a number you already know.",
+    KNOWN_NUMBER_CALLBACK:
+      "If unsure, call back using a number you already know — not one from this message.",
+    TRUSTED_CONTACT_CONFIRMATION:
+      "Stop. Contact your trusted person through a separate channel before acting.",
+    MANDATORY_HOLD_AND_VERIFY:
+      "Do not act on this request. Contact your trusted person through a number you already know.",
   },
 
   failures: {
-    checkUnavailable: "We could not check this request. Do not act on it yet. Use a phone number you already know.",
-    supabaseUnavailable: "Our service is temporarily unavailable. Do not act on the request. Follow your printed safety card.",
-    deliveryFailed: "We could not reach your trusted contact automatically. Call them using a number you already know.",
-    pollingFailed: "We could not retrieve the latest status. Do not act on any pending request until you can verify.",
-    expired: "This verification link has expired. Do not act on the original request without re-verifying.",
-    unknown: "This link is not recognized. Do not act on any related request without independently verifying.",
-    modelUnavailable: "The message could not be analyzed fully. A cautious risk level has been applied. Do not act until you verify through a number you already know.",
+    checkUnavailable:
+      "We could not check this request. Do not act on it yet. Use a phone number you already know.",
+    supabaseUnavailable:
+      "Our service is temporarily unavailable. Do not act on the request. Follow your printed safety card.",
+    deliveryFailed:
+      "We could not reach your trusted contact automatically. Call them using a number you already know.",
+    pollingFailed:
+      "We could not retrieve the latest status. Do not act on any pending request until you can verify.",
+    expired:
+      "This verification link has expired. Do not act on the original request without re-verifying.",
+    unknown:
+      "This link is not recognized. Do not act on any related request without independently verifying.",
+    modelUnavailable:
+      "The message could not be analyzed fully. A cautious risk level has been applied. Do not act until you verify through a number you already know.",
   },
 
   labels: {

@@ -14,11 +14,36 @@ type SignalMetrics = {
 };
 
 const signalMetrics: Record<SignalName, SignalMetrics> = {
-  urgency: { truePositives: 0, falsePositives: 0, trueNegatives: 0, falseNegatives: 0 },
-  secrecy: { truePositives: 0, falsePositives: 0, trueNegatives: 0, falseNegatives: 0 },
-  payment: { truePositives: 0, falsePositives: 0, trueNegatives: 0, falseNegatives: 0 },
-  credentials: { truePositives: 0, falsePositives: 0, trueNegatives: 0, falseNegatives: 0 },
-  changed_contact: { truePositives: 0, falsePositives: 0, trueNegatives: 0, falseNegatives: 0 },
+  urgency: {
+    truePositives: 0,
+    falsePositives: 0,
+    trueNegatives: 0,
+    falseNegatives: 0,
+  },
+  secrecy: {
+    truePositives: 0,
+    falsePositives: 0,
+    trueNegatives: 0,
+    falseNegatives: 0,
+  },
+  payment: {
+    truePositives: 0,
+    falsePositives: 0,
+    trueNegatives: 0,
+    falseNegatives: 0,
+  },
+  credentials: {
+    truePositives: 0,
+    falsePositives: 0,
+    trueNegatives: 0,
+    falseNegatives: 0,
+  },
+  changed_contact: {
+    truePositives: 0,
+    falsePositives: 0,
+    trueNegatives: 0,
+    falseNegatives: 0,
+  },
 };
 
 let minimumLevelViolations = 0;
@@ -35,10 +60,15 @@ async function main() {
   for (const evalCase of evalCases) {
     let extraction;
     try {
-      extraction = await extractor.extract({ text: evalCase.text, requestId: evalCase.id });
+      extraction = await extractor.extract({
+        text: evalCase.text,
+        requestId: evalCase.id,
+      });
     } catch (e) {
       schemaFailures++;
-      console.error(`SCHEMA FAILURE [${evalCase.id}]: ${e instanceof Error ? e.message : String(e)}`);
+      console.error(
+        `SCHEMA FAILURE [${evalCase.id}]: ${e instanceof Error ? e.message : String(e)}`,
+      );
       continue;
     }
 
@@ -47,28 +77,39 @@ async function main() {
     // Check minimum level
     if (levels.indexOf(policy.level) < levels.indexOf(evalCase.minimumLevel)) {
       minimumLevelViolations++;
-      console.warn(`LEVEL VIOLATION [${evalCase.id}]: expected >=${evalCase.minimumLevel}, got ${policy.level}`);
+      console.warn(
+        `LEVEL VIOLATION [${evalCase.id}]: expected >=${evalCase.minimumLevel}, got ${policy.level}`,
+      );
       console.warn(`  Text: "${evalCase.text.slice(0, 80)}..."`);
     }
 
     // Per-signal metrics
     for (const signalName of Object.keys(signalMetrics) as SignalName[]) {
       const signal = extraction.signals[signalName];
-      const expectedPresent = evalCase.expectedPresentSignals.includes(signalName);
-      const expectedAbsent = evalCase.expectedAbsentSignals.includes(signalName);
+      const expectedPresent =
+        evalCase.expectedPresentSignals.includes(signalName);
+      const expectedAbsent =
+        evalCase.expectedAbsentSignals.includes(signalName);
       const actual = signal.present;
 
       if (expectedPresent && actual) signalMetrics[signalName].truePositives++;
-      else if (expectedPresent && !actual) signalMetrics[signalName].falseNegatives++;
-      else if (expectedAbsent && actual) signalMetrics[signalName].falsePositives++;
-      else if (expectedAbsent && !actual) signalMetrics[signalName].trueNegatives++;
+      else if (expectedPresent && !actual)
+        signalMetrics[signalName].falseNegatives++;
+      else if (expectedAbsent && actual)
+        signalMetrics[signalName].falsePositives++;
+      else if (expectedAbsent && !actual)
+        signalMetrics[signalName].trueNegatives++;
     }
   }
 
   // Print metrics
   console.log("=== Signal Metrics ===");
-  for (const [name, m] of Object.entries(signalMetrics) as [SignalName, SignalMetrics][]) {
-    const precision = m.truePositives / (m.truePositives + m.falsePositives) || 0;
+  for (const [name, m] of Object.entries(signalMetrics) as [
+    SignalName,
+    SignalMetrics,
+  ][]) {
+    const precision =
+      m.truePositives / (m.truePositives + m.falsePositives) || 0;
     const recall = m.truePositives / (m.truePositives + m.falseNegatives) || 0;
     console.log(
       `${name.padEnd(20)} P=${(precision * 100).toFixed(1)}%  R=${(recall * 100).toFixed(1)}%  TP=${m.truePositives}  FP=${m.falsePositives}  FN=${m.falseNegatives}`,

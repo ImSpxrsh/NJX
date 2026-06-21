@@ -28,10 +28,10 @@ If your server runs with `CIRCLECHECK_REPOSITORY_MODE=demo`, high-risk analyses 
 
 ## Settings
 
-| Setting | Default | Description |
-|---|---|---|
-| Server URL | `http://localhost:3000` | URL of the CircleCheck server |
-| Household ID | Demo UUID | UUID of the household (demo mode only) |
+| Setting      | Default                 | Description                            |
+| ------------ | ----------------------- | -------------------------------------- |
+| Server URL   | `http://localhost:3000` | URL of the CircleCheck server          |
+| Household ID | Demo UUID               | UUID of the household (demo mode only) |
 
 ## Building from command line
 

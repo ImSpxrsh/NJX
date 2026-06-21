@@ -8,6 +8,7 @@ messages, contact destinations, or service credentials.
 Input: `{ householdId: uuid, message: string, mode?: "fixture"|"llm" }`.
 
 **Production response** — strict schema, no demo-only fields:
+
 ```json
 {
   "checkId": "<uuid>",
@@ -20,6 +21,7 @@ Input: `{ householdId: uuid, message: string, mode?: "fixture"|"llm" }`.
   }
 }
 ```
+
 `verification` is omitted when no contact confirmation is required.
 The production schema never includes `demoContactUrl`, raw tokens, token
 hashes, or verification URLs. The strict Zod schema will throw rather than
@@ -27,6 +29,7 @@ silently include forbidden fields.
 
 **Demo response** — only returned when `CIRCLECHECK_REPOSITORY_MODE=demo`
 and `NODE_ENV` is not `production`:
+
 ```json
 {
   "checkId": "<uuid>",
@@ -37,6 +40,7 @@ and `NODE_ENV` is not `production`:
   "demoContactUrl": "http://localhost:3000/verify/<token>"
 }
 ```
+
 `demoContactUrl` is present only when verification is required.
 Client-supplied data (query params, headers, body fields, cookies) cannot
 activate demo mode or cause `demoContactUrl` to appear.
@@ -133,6 +137,7 @@ or mismatched codes never verify (400); too many attempts lock the challenge
 High-trust gate. Returns `{ eligible: true, contact }` only when the destination
 is already verified; otherwise 403. Unverified destinations never receive a
 high-trust verification request.
+
 ### Twilio signature verification (CC-206)
 
 Both Twilio routes verify the request before any processing. The signature is

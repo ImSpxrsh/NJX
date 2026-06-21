@@ -132,7 +132,8 @@ export function createSupabaseRepositories(
     expiry: {
       async expirePendingChecks(): Promise<ExpiryResult> {
         const { data, error } = await client.rpc("expire_pending_checks");
-        if (error) throw new Error(`[supabase] expiry failed: ${error.message}`);
+        if (error)
+          throw new Error(`[supabase] expiry failed: ${error.message}`);
         const rpcResultSchema = z
           .array(
             z.object({

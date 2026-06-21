@@ -54,11 +54,16 @@ describe("mappers — mapCheckRow", () => {
       expiresAt: null,
     });
     expect(result.extraction).toBeDefined();
-    expect(result.policyReasons).toEqual(["No listed warning signs were identified."]);
+    expect(result.policyReasons).toEqual([
+      "No listed warning signs were identified.",
+    ]);
   });
 
   it("reads status_source from DB row when present", async () => {
-    const row = await buildValidCheckRow({ status_source: "SYSTEM_EXPIRY", state: "EXPIRED" });
+    const row = await buildValidCheckRow({
+      status_source: "SYSTEM_EXPIRY",
+      state: "EXPIRED",
+    });
     const result = mapCheckRow(row);
     expect(result.statusSource).toBe("SYSTEM_EXPIRY");
   });
@@ -83,12 +88,16 @@ describe("mappers — mapCheckRow", () => {
     const rowNull = await buildValidCheckRow({ expires_at: null });
     expect(mapCheckRow(rowNull).expiresAt).toBeNull();
 
-    const rowWithExpiry = await buildValidCheckRow({ expires_at: futureTimestamp });
+    const rowWithExpiry = await buildValidCheckRow({
+      expires_at: futureTimestamp,
+    });
     expect(mapCheckRow(rowWithExpiry).expiresAt).toBe(futureTimestamp);
   });
 
   it("reads requested_action from DB row", async () => {
-    const row = await buildValidCheckRow({ requested_action: "Send $500 in gift cards" });
+    const row = await buildValidCheckRow({
+      requested_action: "Send $500 in gift cards",
+    });
     const result = mapCheckRow(row);
     expect(result.requestedAction).toBe("Send $500 in gift cards");
   });
