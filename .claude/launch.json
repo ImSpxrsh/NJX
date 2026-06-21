@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "verus",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/jananipemmasani/Documents/GitHub/Verus",
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    }
+  ]
+}

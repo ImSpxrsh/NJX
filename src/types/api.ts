@@ -60,3 +60,26 @@ export type EnrollmentStartResponse = {
 export type EnrollmentConfirmResponse = { ok: boolean };
 
 export type EnrollmentStatusResponse = EnrollmentVerificationStatusView;
+
+// --- Enrollment contact management (CC-201 / CC-404) ---
+// Public-safe contact projection. Deliberately omits the raw destination value
+// (phone/email) and household id, per the API-wide rule that responses never
+// include contact destinations.
+export type EnrollmentContactView = {
+  contactId: string;
+  displayName: string;
+  channel: "sms" | "email" | "manual_demo";
+  destinationVerified: boolean;
+  createdAt: string;
+};
+
+export type ContactListResponse = { contacts: EnrollmentContactView[] };
+
+export type DeleteContactResponse = { ok: boolean };
+
+// High-trust gate: a high-trust workflow may target a contact only when its
+// destination is already verified.
+export type HighTrustEligibilityResponse = {
+  eligible: boolean;
+  contact: EnrollmentContactView;
+};

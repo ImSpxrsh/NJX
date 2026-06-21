@@ -256,6 +256,10 @@ export function resetDemo() {
   store.phoneCallIds.clear();
   store.phoneAlerts.clear();
   store.enrollments.clear();
+  // Reset enrolled contacts too, then reseed the canonical demo contact. Prior
+  // to per-household limits this map was never cleared, which let contacts
+  // accumulate across resets; the cap makes a full reset necessary.
+  store.contacts.clear();
   resetEnrollmentDemo();
   seedContacts();
 }
@@ -325,6 +329,33 @@ export function createDemoRepositories(): CircleCheckRepositories {
           }
         }
         return null;
+      },
+      async listForHousehold(id) {
+        return [...store.contacts.values()]
+          .filter((contact) => contact.householdId === id)
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+          .map((contact) => structuredClone(contact));
+      },
+      async countForHousehold(id) {
+        let count = 0;
+        for (const contact of store.contacts.values()) {
+          if (contact.householdId === id) count += 1;
+        }
+        return count;
+      },
+      async remove(id, contactId) {
+        const contact = store.contacts.get(contactId);
+        // Ownership scoped: a cross-household or missing id is a no-op so the
+        // caller cannot probe another household's contacts.
+        if (!contact || contact.householdId !== id) return false;
+        store.contacts.delete(contactId);
+        // Drop any enrollment secrets tied to the removed contact.
+        for (const [enrollmentId, record] of store.enrollments) {
+          if (record.trustedContactId === contactId) {
+            store.enrollments.delete(enrollmentId);
+          }
+        }
+        return true;
       },
     },
     enrollmentVerifications: createEnrollmentDemoRepository(),

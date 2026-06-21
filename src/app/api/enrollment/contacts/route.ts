@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRepositories } from "@/lib/repository/factory";
-import type { CreateContactResponse } from "@/types/api";
+import { toContactView } from "@/lib/enrollment/contact-view";
+import type { ContactListResponse, CreateContactResponse } from "@/types/api";
 
 const channel = z.enum(["sms", "email"]);
 
@@ -24,6 +25,22 @@ const changeSchema = z
 
 const noStore = { "Cache-Control": "no-store" } as const;
 
+// List a household's contacts (CC-201). The household is taken from the query
+// and scoped at the repository; responses never include destination values.
+export async function GET(request: Request) {
+  const householdId = new URL(request.url).searchParams.get("householdId");
+  if (!householdId || !z.string().uuid().safeParse(householdId).success) {
+    return NextResponse.json(
+      { error: "A valid householdId is required." },
+      { status: 400, headers: noStore },
+    );
+  }
+  const contacts =
+    await getRepositories().trustedContacts.listForHousehold(householdId);
+  const body: ContactListResponse = { contacts: contacts.map(toContactView) };
+  return NextResponse.json(body, { headers: noStore });
+}
+
 export async function POST(request: Request) {
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -37,6 +54,14 @@ export async function POST(request: Request) {
     requestId: crypto.randomUUID(),
   });
   if (!result.ok) {
+    // The per-household cap is a distinct, non-sensitive throttle (429); an
+    // invalid destination stays a generic 400.
+    if (result.code === "LIMIT_EXCEEDED") {
+      return NextResponse.json(
+        { error: "This household has reached its destination limit." },
+        { status: 429, headers: noStore },
+      );
+    }
     return NextResponse.json(
       { error: "That destination is not valid." },
       { status: 400, headers: noStore },

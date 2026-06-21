@@ -40,6 +40,7 @@ type Config = {
   startWindowMs: number;
   confirmLimit: number;
   confirmWindowMs: number;
+  maxDestinationsPerHousehold: number;
 };
 
 function intEnv(name: string, fallback: number, min: number, max: number) {
@@ -65,6 +66,12 @@ function getConfig(): Config {
       600_000,
       1_000,
       86_400_000,
+    ),
+    maxDestinationsPerHousehold: intEnv(
+      "MAX_DESTINATIONS_PER_HOUSEHOLD",
+      10,
+      1,
+      1_000,
     ),
   };
 }
@@ -176,6 +183,22 @@ export function createEnrollmentDemoRepository(): EnrollmentVerificationReposito
       const normalized = normalizeDestination(input.channel, input.destination);
       if (!normalized.ok) {
         return { ok: false, code: "INVALID_DESTINATION" };
+      }
+      // Spam prevention (CC-404): cap the destinations a household may enroll.
+      const cap = getConfig().maxDestinationsPerHousehold;
+      let householdCount = 0;
+      for (const existing of store.contacts.values()) {
+        if (existing.householdId === input.householdId) householdCount += 1;
+      }
+      if (householdCount >= cap) {
+        recordAuditEvent({
+          event: "enrollment.contact.create",
+          outcome: "rate_limited",
+          requestId: input.requestId,
+          householdId: input.householdId,
+          channel: input.channel,
+        });
+        return { ok: false, code: "LIMIT_EXCEEDED" };
       }
       const now = new Date().toISOString();
       const contact: TrustedContactRecord = {

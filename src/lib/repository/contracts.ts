@@ -41,6 +41,16 @@ export interface TrustedContactRepository {
   getVerifiedForHousehold(
     householdId: string,
   ): Promise<TrustedContactRecord | null>;
+  /** All of a household's contacts (CC-201 management surface). */
+  listForHousehold(householdId: string): Promise<TrustedContactRecord[]>;
+  /** Count for the per-household destination cap (CC-404). */
+  countForHousehold(householdId: string): Promise<number>;
+  /**
+   * Delete a contact scoped to its household. Cross-household or missing ids
+   * return false, so the caller surfaces a generic not-found and never confirms
+   * the existence of another household's contact.
+   */
+  remove(householdId: string, id: string): Promise<boolean>;
 }
 
 export type VerificationContext = {
@@ -147,7 +157,8 @@ export type CreateContactInput = {
 
 export type CreateContactResult =
   | { ok: true; contact: TrustedContactRecord }
-  | { ok: false; code: "INVALID_DESTINATION" };
+  // LIMIT_EXCEEDED: the household is at its configured destination cap (CC-404).
+  | { ok: false; code: "INVALID_DESTINATION" | "LIMIT_EXCEEDED" };
 
 export type ChangeDestinationInput = {
   trustedContactId: string;

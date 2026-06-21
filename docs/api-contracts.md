@@ -73,6 +73,38 @@ token existed, expired, was used, or is locked.
 Returns `{ trustedContactId, channel, status, destinationVerified, expiresAt }`.
 Never includes the destination value or any secret. Unknown ids receive a 404.
 
+## Enrollment contact management (CC-201 / CC-404)
+
+Read/list/delete and the per-household destination cap and high-trust gate.
+Responses never include the raw destination value. The household is scoped at the
+repository boundary; a cross-household id is indistinguishable from a missing one.
+
+### `GET /api/enrollment/contacts?householdId=...`
+
+Lists the household's contacts as
+`{ contacts: [{ contactId, displayName, channel, destinationVerified, createdAt }] }`.
+
+### `GET /api/enrollment/contacts/:id?householdId=...`
+
+Returns one contact in the same public-safe shape. Cross-household or unknown ids
+receive a generic 404.
+
+### `DELETE /api/enrollment/contacts/:id?householdId=...`
+
+Removes an owned contact (and any pending enrollment secret). Returns
+`{ ok: true }`; cross-household or unknown ids receive a generic 404.
+
+### `POST /api/enrollment/contacts/:id/high-trust`
+
+Input: `{ householdId: uuid }`. Returns `{ eligible: true, contact }` only when
+the destination is already verified; otherwise 403. Enforces that unverified
+destinations never receive a high-trust verification request.
+
+### Destination cap
+
+`POST /api/enrollment/contacts` rejects creation with 429 once a household
+reaches `MAX_DESTINATIONS_PER_HOUSEHOLD` (default 10).
+
 ## `POST /api/demo/reset`
 
 Clears process-local demo state. This route must be disabled or authenticated
