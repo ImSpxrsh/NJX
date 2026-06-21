@@ -22,3 +22,6 @@ jobs:
       - run: npm run build
         env:
           CIRCLECHECK_REPOSITORY_MODE: demo
+          CIRCLECHECK_RUNTIME_MODE: demo
+          CIRCLECHECK_DEMO_DEPLOYMENT: "true"
+          PUBLIC_APP_URL: http://localhost:3000
