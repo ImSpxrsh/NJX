@@ -7,7 +7,12 @@ export function ReadAloudButton({ text }: { text: string }) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
   }
   return (
-    <button className="secondary" type="button" onClick={read}>
+    <button
+      className="secondary"
+      type="button"
+      onClick={read}
+      aria-label="Read the status message aloud using text-to-speech"
+    >
       🔊 Read this aloud
     </button>
   );
