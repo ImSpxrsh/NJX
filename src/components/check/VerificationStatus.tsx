@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { CheckStatusResponse } from "@/types/api";
 import { ReadAloudButton } from "@/components/accessibility/ReadAloudButton";
@@ -18,25 +18,43 @@ const headings = {
     "Verification expired. Do not proceed. Start a new check or call a known number.",
 } as const;
 
+const POLL_INTERVAL_MS = 3_000;
+
 export function VerificationStatus({ checkId }: { checkId: string }) {
   const [data, setData] = useState<CheckStatusResponse | null>(null);
   const [contactUrl, setContactUrl] = useState<string | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const prevStateRef = useRef<string | null>(null);
 
   useEffect(() => {
     const contactUrlTimer = window.setTimeout(() => {
       setContactUrl(sessionStorage.getItem(`circlecheck:${checkId}`));
     }, 0);
     let active = true;
+
     async function load() {
-      const response = await fetch(`/api/checks/${checkId}`, {
-        cache: "no-store",
-      });
-      if (response.ok && active) {
-        setData((await response.json()) as CheckStatusResponse);
+      try {
+        const response = await fetch(`/api/checks/${checkId}`, {
+          cache: "no-store",
+        });
+        if (response.ok && active) {
+          const next = (await response.json()) as CheckStatusResponse;
+          setData((current) => {
+            // Move focus to result region when state changes
+            if (current !== null && current.state !== next.state) {
+              window.setTimeout(() => resultRef.current?.focus(), 0);
+            }
+            prevStateRef.current = next.state;
+            return next;
+          });
+        }
+      } catch {
+        // Network error during polling — silently ignore, keep polling
       }
     }
+
     void load();
-    const interval = window.setInterval(load, 2500);
+    const interval = window.setInterval(load, POLL_INTERVAL_MS);
     return () => {
       active = false;
       window.clearTimeout(contactUrlTimer);
@@ -45,21 +63,34 @@ export function VerificationStatus({ checkId }: { checkId: string }) {
   }, [checkId]);
 
   if (!data) return <p role="status">Loading this check…</p>;
+
   const isHold = data.level === "L3" && data.state === "PENDING";
+
+  // CC-407: never show VERIFIED solely from polling; require authoritative source
+  const displayState =
+    data.state === "VERIFIED" && data.statusSource !== "ENROLLED_CONTACT"
+      ? "PENDING"
+      : data.state;
+
   const tone =
-    data.state === "PENDING"
+    displayState === "PENDING"
       ? isHold
         ? "hold"
         : "pending"
-      : data.state === "VERIFIED" ||
-          data.state === "DENIED" ||
-          data.state === "EXPIRED"
+      : displayState === "VERIFIED" ||
+          displayState === "DENIED" ||
+          displayState === "EXPIRED"
         ? "final"
         : "status";
 
   return (
-    <div className="grid">
-      <StatusBanner tone={tone} title={headings[data.state]}>
+    <div
+      className="grid"
+      ref={resultRef}
+      tabIndex={-1}
+      style={{ outline: "none" }}
+    >
+      <StatusBanner tone={tone} title={headings[displayState]}>
         {isHold && (
           <p>
             <strong>
@@ -69,17 +100,17 @@ export function VerificationStatus({ checkId }: { checkId: string }) {
           </p>
         )}
         <p>{data.contactResponseStatus}</p>
-        {data.expiresAt && data.state === "PENDING" && (
+        {data.expiresAt && displayState === "PENDING" && (
           <p className="muted">
             This request expires at {new Date(data.expiresAt).toLocaleString()}.
           </p>
         )}
         <ReadAloudButton
-          text={`${headings[data.state]} ${data.contactResponseStatus}`}
+          text={`${headings[displayState]} ${data.contactResponseStatus}`}
         />
       </StatusBanner>
 
-      <section className="card">
+      <section className="card" aria-label="What CircleCheck noticed">
         <p className="eyebrow">Verification level {data.level}</p>
         <h2>What CircleCheck noticed</h2>
         <p>{data.summary}</p>
@@ -95,7 +126,7 @@ export function VerificationStatus({ checkId }: { checkId: string }) {
         </div>
       </section>
 
-      {contactUrl && data.state === "PENDING" && (
+      {contactUrl && displayState === "PENDING" && (
         <section className="card">
           <p className="eyebrow">Demo delivery channel</p>
           <h2>Open the trusted-contact view</h2>
@@ -103,7 +134,11 @@ export function VerificationStatus({ checkId }: { checkId: string }) {
             In production, this one-time link is sent to the pre-enrolled
             contact. It is shown here only for the deterministic hackathon demo.
           </p>
-          <Link className="button" href={contactUrl}>
+          <Link
+            className="button"
+            href={contactUrl}
+            aria-label="Open the trusted contact verification link"
+          >
             Open contact link
           </Link>
         </section>
