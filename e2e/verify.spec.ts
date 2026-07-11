@@ -8,8 +8,12 @@ test.describe("verify page", () => {
     // render a graceful error state (expired/invalid token UI).
     await page.goto("/verify/not-a-real-token-abcdefghijklmnopq1234");
     // The page should load (not 500) and show something meaningful
-    await expect(page.locator("body")).not.toContainText(/500|internal server error/i);
-    await expect(page.locator("h1, [role='heading']").first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator("body")).not.toContainText(
+      /500|internal server error/i,
+    );
+    await expect(page.locator("h1, [role='heading']").first()).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("verify page renders the contact response form for valid token format", async ({
@@ -20,7 +24,9 @@ test.describe("verify page", () => {
     // This tests the page renders without crashing rather than the happy path.
     const fakeToken = "a".repeat(43);
     await page.goto(`/verify/${fakeToken}`);
-    await expect(page.locator("body")).not.toContainText(/500|internal server error/i);
+    await expect(page.locator("body")).not.toContainText(
+      /500|internal server error/i,
+    );
     // Page should load with headings visible
     await expect(page.locator("h1").first()).toBeVisible({ timeout: 5_000 });
   });
@@ -35,7 +41,11 @@ test.describe("verify page", () => {
 
   test("phone instructions page loads", async ({ page }) => {
     await page.goto("/phone");
-    await expect(page.locator("body")).not.toContainText(/500|internal server error/i);
-    await expect(page.locator("h1, [role='heading']").first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator("body")).not.toContainText(
+      /500|internal server error/i,
+    );
+    await expect(page.locator("h1, [role='heading']").first()).toBeVisible({
+      timeout: 5_000,
+    });
   });
 });
