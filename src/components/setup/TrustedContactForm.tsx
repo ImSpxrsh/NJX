@@ -66,7 +66,10 @@ export function TrustedContactForm() {
         );
         return;
       }
-      const body = (await res.json()) as { contactId: string; channel: Channel };
+      const body = (await res.json()) as {
+        contactId: string;
+        channel: Channel;
+      };
       const savedContact: ContactData = {
         contactId: body.contactId,
         displayName,
@@ -286,8 +289,8 @@ export function TrustedContactForm() {
               They will receive alerts when you submit a suspicious message.
             </p>
             <p className="muted">
-              Print the safety card below and keep it near your phone. Share
-              the callback number with your household.
+              Print the safety card below and keep it near your phone. Share the
+              callback number with your household.
             </p>
             <button type="button" onClick={() => window.print()}>
               Print safety card
