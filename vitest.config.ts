@@ -15,5 +15,6 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["src/test/setup.ts"],
     coverage: { reporter: ["text", "html"] },
+    exclude: ["**/node_modules/**", "**/e2e/**"],
   },
 });
