@@ -2,32 +2,37 @@
 
 ## Role Matrix
 
-| Role | Description | Access |
-|------|-------------|--------|
-| `service_role` | Backend server | Full access bypassing RLS |
-| `anon` | Unauthenticated public | Read-only on `checks` status field only |
+| Role            | Description                       | Access                                     |
+| --------------- | --------------------------------- | ------------------------------------------ |
+| `service_role`  | Backend server                    | Full access bypassing RLS                  |
+| `anon`          | Unauthenticated public            | Read-only on `checks` status field only    |
 | `authenticated` | End-user JWT (not used currently) | Reserved for future household self-service |
 
 ## Table-by-Table Permissions
 
 ### `checks`
+
 - `service_role`: INSERT, SELECT, UPDATE (status, contacted_at, completed_at)
 - `anon`: SELECT on `(id, status, status_source, level, summary, created_at)` only — no message text, no contact data
 
 ### `contacts`
+
 - `service_role`: INSERT, SELECT, UPDATE, DELETE
 - `anon`: No access
 - Rationale: Contact phone/email never exposed to the public
 
 ### `households`
+
 - `service_role`: INSERT, SELECT, UPDATE
 - `anon`: No access
 
 ### `verification_tokens`
+
 - `service_role`: INSERT, SELECT, UPDATE (consumed_at)
 - `anon`: No access — token lookup goes through service_role only
 
 ### `enrolled_contacts`
+
 - `service_role`: INSERT, SELECT, UPDATE
 - `anon`: No access
 

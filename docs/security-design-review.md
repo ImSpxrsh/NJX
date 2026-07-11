@@ -33,14 +33,14 @@ Next.js page (server render)
 
 ## Trust Boundaries
 
-| Boundary | Crossing | Control |
-|----------|---------|---------|
-| Internet → API routes | All requests | Rate limiting, input validation (Zod), security headers |
-| API routes → Supabase | service_role | Env var secret, server-only |
-| API routes → Twilio | Auth token | Env var secret, server-only |
-| API routes → Anthropic | API key | Env var secret, server-only, input size limit |
-| Twilio → `/api/twilio/*` | Webhook callbacks | HMAC signature validation |
-| Demo reset → server | POST | Origin header CSRF check against publicAppUrl |
+| Boundary                 | Crossing          | Control                                                 |
+| ------------------------ | ----------------- | ------------------------------------------------------- |
+| Internet → API routes    | All requests      | Rate limiting, input validation (Zod), security headers |
+| API routes → Supabase    | service_role      | Env var secret, server-only                             |
+| API routes → Twilio      | Auth token        | Env var secret, server-only                             |
+| API routes → Anthropic   | API key           | Env var secret, server-only, input size limit           |
+| Twilio → `/api/twilio/*` | Webhook callbacks | HMAC signature validation                               |
+| Demo reset → server      | POST              | Origin header CSRF check against publicAppUrl           |
 
 ## Terminal State Transitions
 
@@ -85,6 +85,7 @@ Once a check reaches VERIFIED, DENIED, or EXPIRED, no further transitions are al
 ## Logging Security
 
 Enforced by `src/lib/security/redact.ts`:
+
 - No raw message text in logs.
 - No token URLs.
 - No contact destinations.
@@ -93,14 +94,14 @@ Enforced by `src/lib/security/redact.ts`:
 
 ## Abuse Scenarios
 
-| Scenario | Mitigation |
-|----------|-----------|
-| Spam the analyze endpoint | Rate limit: 5 requests / minute per IP |
-| Enumerate check IDs | Check IDs are UUIDs; status endpoint requires valid ID |
-| Replay a verification token | Tokens are single-use; second use returns 410 |
-| Demo reset from wrong origin | CSRF check: origin must match publicAppUrl |
-| Inject into LLM prompt | Untrusted-data delimiters; Zod output validation; deterministic floor |
-| Forge Twilio callback | HMAC signature required |
+| Scenario                     | Mitigation                                                            |
+| ---------------------------- | --------------------------------------------------------------------- |
+| Spam the analyze endpoint    | Rate limit: 5 requests / minute per IP                                |
+| Enumerate check IDs          | Check IDs are UUIDs; status endpoint requires valid ID                |
+| Replay a verification token  | Tokens are single-use; second use returns 410                         |
+| Demo reset from wrong origin | CSRF check: origin must match publicAppUrl                            |
+| Inject into LLM prompt       | Untrusted-data delimiters; Zod output validation; deterministic floor |
+| Forge Twilio callback        | HMAC signature required                                               |
 
 ## Unresolved Risks
 

@@ -6,12 +6,12 @@ Realistic targets for a hackathon or small pilot deployment (10–100 concurrent
 
 ## Pilot Targets
 
-| Scenario | Target | Acceptable latency |
-|----------|--------|-------------------|
-| Analyze endpoint | 20 concurrent requests | p95 < 3s |
-| Status polling | 50 concurrent pollers (3s interval) | p95 < 500ms |
-| Twilio callbacks | 5 concurrent | p95 < 2s |
-| Verification response | 10 concurrent | p95 < 1s |
+| Scenario              | Target                              | Acceptable latency |
+| --------------------- | ----------------------------------- | ------------------ |
+| Analyze endpoint      | 20 concurrent requests              | p95 < 3s           |
+| Status polling        | 50 concurrent pollers (3s interval) | p95 < 500ms        |
+| Twilio callbacks      | 5 concurrent                        | p95 < 2s           |
+| Verification response | 10 concurrent                       | p95 < 1s           |
 
 ## Test Scenarios
 

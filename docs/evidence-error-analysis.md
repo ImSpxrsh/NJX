@@ -34,7 +34,7 @@ The message is not actually urgent or high-risk but `urgency.score` is elevated.
 
 **Common false positives:** Customer service messages with deadlines, legitimate appointment reminders, news alerts.
 
-**Mitigation:** Tighten the urgency pattern to require both a deadline *and* a financial or credential element.
+**Mitigation:** Tighten the urgency pattern to require both a deadline _and_ a financial or credential element.
 
 ### 5. Span Quality
 
@@ -69,6 +69,7 @@ The deterministic and model extractors disagree on a signal.
 ## Optimization Guidelines
 
 Before expanding any pattern list:
+
 1. Identify which cases improve (by re-running `evals/`).
 2. Identify what regressions could occur (run the full eval set).
 3. Quantify: how many true positives gained vs. true negatives lost.

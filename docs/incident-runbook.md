@@ -5,6 +5,7 @@
 **Who acts:** Backend engineer, captain notified.
 
 **Steps:**
+
 1. Check Supabase status page and Twilio status page.
 2. If Supabase is down: the analyze endpoint falls back to demo repository if `CIRCLECHECK_RUNTIME_MODE=demo`; otherwise returns 503. Do not serve stale check data.
 3. If Twilio is down: notification sends will fail. The check remains PENDING — this is correct behavior. Users see "contact delivery failed" UI.
