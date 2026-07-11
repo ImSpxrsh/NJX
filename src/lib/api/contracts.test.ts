@@ -6,11 +6,36 @@ import {
 } from "./contracts";
 
 const validSignals = {
-  urgency: { name: "urgency", score: 0.9, present: true, explanation: "Time pressure detected." },
-  secrecy: { name: "secrecy", score: 0.0, present: false, explanation: "No secrecy indicators." },
-  payment: { name: "payment", score: 0.8, present: true, explanation: "Payment request detected." },
-  credentials: { name: "credentials", score: 0.0, present: false, explanation: "No credential requests." },
-  changed_contact: { name: "changed_contact", score: 0.0, present: false, explanation: "No contact change." },
+  urgency: {
+    name: "urgency",
+    score: 0.9,
+    present: true,
+    explanation: "Time pressure detected.",
+  },
+  secrecy: {
+    name: "secrecy",
+    score: 0.0,
+    present: false,
+    explanation: "No secrecy indicators.",
+  },
+  payment: {
+    name: "payment",
+    score: 0.8,
+    present: true,
+    explanation: "Payment request detected.",
+  },
+  credentials: {
+    name: "credentials",
+    score: 0.0,
+    present: false,
+    explanation: "No credential requests.",
+  },
+  changed_contact: {
+    name: "changed_contact",
+    score: 0.0,
+    present: false,
+    explanation: "No contact change.",
+  },
 };
 
 const validResponse = {
@@ -55,17 +80,28 @@ describe("checkStatusResponseSchema", () => {
       urgency: { ...validSignals.urgency, score: 1.5 },
     };
     expect(() =>
-      checkStatusResponseSchema.parse({ ...validResponse, signals: badSignals }),
+      checkStatusResponseSchema.parse({
+        ...validResponse,
+        signals: badSignals,
+      }),
     ).toThrow();
   });
 
   it("rejects unknown signal names in the record", () => {
     const badSignals = {
       ...validSignals,
-      unknown_signal: { name: "unknown_signal", score: 0.5, present: true, explanation: "x" },
+      unknown_signal: {
+        name: "unknown_signal",
+        score: 0.5,
+        present: true,
+        explanation: "x",
+      },
     };
     expect(() =>
-      checkStatusResponseSchema.parse({ ...validResponse, signals: badSignals }),
+      checkStatusResponseSchema.parse({
+        ...validResponse,
+        signals: badSignals,
+      }),
     ).toThrow();
   });
 
@@ -82,7 +118,10 @@ describe("checkStatusResponseSchema", () => {
 
   it("rejects non-UUID checkId", () => {
     expect(() =>
-      checkStatusResponseSchema.parse({ ...validResponse, checkId: "not-a-uuid" }),
+      checkStatusResponseSchema.parse({
+        ...validResponse,
+        checkId: "not-a-uuid",
+      }),
     ).toThrow();
   });
 });
@@ -107,9 +146,7 @@ describe("apiErrorSchema", () => {
   });
 
   it("rejects extra fields", () => {
-    expect(() =>
-      apiErrorSchema.parse({ error: "fail", code: 400 }),
-    ).toThrow();
+    expect(() => apiErrorSchema.parse({ error: "fail", code: 400 })).toThrow();
   });
 
   it("rejects missing error field", () => {
