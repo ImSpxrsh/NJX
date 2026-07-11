@@ -15,7 +15,8 @@
     "db:types": "npx supabase gen types typescript --local > src/types/database.ts",
     "test:db": "npx supabase test db",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:e2e": "playwright test"
   },
   "overrides": {
     "postcss": "^8.5.15"
@@ -31,6 +32,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^24.3.0",
